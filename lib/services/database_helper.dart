@@ -1,0 +1,434 @@
+import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:path/path.dart';
+import 'dart:convert';
+import 'dart:io';
+import '../models/word_list.dart';
+import '../models/word_attempt.dart';
+import '../models/word_schedule.dart';
+
+class DatabaseHelper {
+  static final DatabaseHelper _instance = DatabaseHelper._internal();
+  static Database? _database;
+
+  factory DatabaseHelper() => _instance;
+
+  DatabaseHelper._internal();
+
+  // Initialize database factory for different platforms
+  static Future<void> init() async {
+    if (Platform.isWindows || Platform.isLinux) {
+      // Initialize FFI
+      sqfliteFfiInit();
+      databaseFactory = databaseFactoryFfi;
+    }
+  }
+
+  Future<Database> get database async {
+    if (_database != null) return _database!;
+    _database = await _initDatabase();
+    return _database!;
+  }
+
+  Future<Database> _initDatabase() async {
+    String path = join(await getDatabasesPath(), 'reading_assistant.db');
+    return await openDatabase(
+      path,
+      version: 2, // Increased version to trigger upgrade
+      onCreate: _createDatabase,
+      onUpgrade: _upgradeDatabase,
+    );
+  }
+
+  Future<void> _upgradeDatabase(
+    Database db,
+    int oldVersion,
+    int newVersion,
+  ) async {
+    if (oldVersion < 2) {
+      // Add assessment_results table if it doesn't exist
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS assessment_results (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          word TEXT NOT NULL,
+          date TEXT NOT NULL,
+          result TEXT NOT NULL,
+          heard TEXT NOT NULL,
+          listName TEXT NOT NULL,
+          subject TEXT NOT NULL
+        )
+      ''');
+    }
+  }
+
+  Future<void> _createDatabase(Database db, int version) async {
+    // Create word_lists table
+    await db.execute('''
+      CREATE TABLE word_lists (
+        id TEXT PRIMARY KEY,
+        subject TEXT NOT NULL,
+        list_name TEXT NOT NULL,
+        words TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+
+    // Create word_attempts table
+    await db.execute('''
+      CREATE TABLE word_attempts (
+        id TEXT PRIMARY KEY,
+        word TEXT NOT NULL,
+        date TEXT NOT NULL,
+        result TEXT NOT NULL,
+        type TEXT NOT NULL,
+        repetition_step INTEGER NOT NULL,
+        is_hard INTEGER NOT NULL,
+        subject TEXT NOT NULL,
+        list_name TEXT NOT NULL,
+        heard_or_typed TEXT NOT NULL,
+        timestamp TEXT NOT NULL,
+        UNIQUE(word, date, timestamp)
+      )
+    ''');
+
+    // Create word_schedules table
+    await db.execute('''
+      CREATE TABLE word_schedules (
+        word TEXT PRIMARY KEY,
+        repetition_step INTEGER NOT NULL,
+        last_review_date TEXT NOT NULL,
+        next_review_date TEXT NOT NULL,
+        incorrect_count INTEGER NOT NULL,
+        is_hard INTEGER NOT NULL
+      )
+    ''');
+
+    // Create assessment_results table
+    await db.execute('''
+      CREATE TABLE assessment_results (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        word TEXT NOT NULL,
+        date TEXT NOT NULL,
+        result TEXT NOT NULL,
+        heard TEXT NOT NULL,
+        listName TEXT NOT NULL,
+        subject TEXT NOT NULL
+      )
+    ''');
+
+    // Create indexes for better performance
+    await db.execute('''
+      CREATE INDEX idx_word_attempts_word_date ON word_attempts(word, date)
+    ''');
+
+    await db.execute('''
+      CREATE INDEX idx_word_attempts_subject ON word_attempts(subject)
+    ''');
+
+    await db.execute('''
+      CREATE INDEX idx_word_lists_subject ON word_lists(subject)
+    ''');
+
+    await db.execute('''
+      CREATE INDEX idx_assessment_results_subject ON assessment_results(subject)
+    ''');
+
+    await db.execute('''
+      CREATE INDEX idx_assessment_results_date ON assessment_results(date)
+    ''');
+  }
+
+  // Word Lists operations
+  Future<void> insertWordList(WordList wordList) async {
+    final db = await database;
+    await db.insert(
+      'word_lists',
+      wordList.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<List<WordList>> getAllWordLists() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query('word_lists');
+    return List.generate(maps.length, (i) => WordList.fromMap(maps[i]));
+  }
+
+  Future<List<WordList>> getWordListsBySubject(String subject) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'word_lists',
+      where: 'subject = ?',
+      whereArgs: [subject],
+    );
+    return List.generate(maps.length, (i) => WordList.fromMap(maps[i]));
+  }
+
+  Future<WordList?> getWordListById(String id) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'word_lists',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    if (maps.isNotEmpty) {
+      return WordList.fromMap(maps.first);
+    }
+    return null;
+  }
+
+  Future<void> updateWordList(WordList wordList) async {
+    final db = await database;
+    await db.update(
+      'word_lists',
+      wordList.toMap(),
+      where: 'id = ?',
+      whereArgs: [wordList.id],
+    );
+  }
+
+  Future<void> deleteWordList(String id) async {
+    final db = await database;
+    await db.delete('word_lists', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> deleteWordListsBySubject(String subject) async {
+    final db = await database;
+    await db.delete('word_lists', where: 'subject = ?', whereArgs: [subject]);
+  }
+
+  Future<void> deleteWordAttemptsBySubject(String subject) async {
+    final db = await database;
+    await db.delete(
+      'word_attempts',
+      where: 'subject = ?',
+      whereArgs: [subject],
+    );
+  }
+
+  Future<bool> _tableExists(Database db, String tableName) async {
+    final result = await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+      [tableName],
+    );
+    return result.isNotEmpty;
+  }
+
+  Future<void> deleteAssessmentResultsBySubject(String subject) async {
+    final db = await database;
+
+    // Check if table exists first
+    final tableExists = await _tableExists(db, 'assessment_results');
+    if (tableExists) {
+      await db.delete(
+        'assessment_results',
+        where: 'subject = ?',
+        whereArgs: [subject],
+      );
+    }
+  }
+
+  Future<void> deleteWordSchedulesBySubject(String subject) async {
+    final db = await database;
+
+    // Get all words that belong to the subject being deleted
+    final List<Map<String, dynamic>> wordMaps = await db.query(
+      'word_lists',
+      columns: ['words'],
+      where: 'subject = ?',
+      whereArgs: [subject],
+    );
+
+    // Extract all words from all word lists for this subject
+    final Set<String> wordsToDelete = <String>{};
+    for (final wordMap in wordMaps) {
+      final wordsJson = wordMap['words'] as String;
+      final List<String> words = List<String>.from(jsonDecode(wordsJson));
+      wordsToDelete.addAll(words);
+    }
+
+    // Delete word schedules for these words
+    for (final word in wordsToDelete) {
+      await db.delete('word_schedules', where: 'word = ?', whereArgs: [word]);
+    }
+  }
+
+  Future<List<String>> getAvailableSubjects() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'word_lists',
+      columns: ['subject'],
+      distinct: true,
+    );
+    return maps.map((map) => map['subject'] as String).toList();
+  }
+
+  // Word Attempts operations
+  Future<void> insertWordAttempt(WordAttempt attempt) async {
+    final db = await database;
+    await db.insert(
+      'word_attempts',
+      attempt.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<List<WordAttempt>> getAllWordAttempts() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query('word_attempts');
+    return List.generate(maps.length, (i) => WordAttempt.fromMap(maps[i]));
+  }
+
+  Future<List<WordAttempt>> getWordAttemptsBySubject(String subject) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'word_attempts',
+      where: 'subject = ?',
+      whereArgs: [subject],
+    );
+    return List.generate(maps.length, (i) => WordAttempt.fromMap(maps[i]));
+  }
+
+  Future<List<WordAttempt>> getWordAttemptsByWordAndDate(
+    String word,
+    String date,
+  ) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'word_attempts',
+      where: 'word = ? AND date = ?',
+      whereArgs: [word, date],
+      orderBy: 'timestamp DESC',
+    );
+    return List.generate(maps.length, (i) => WordAttempt.fromMap(maps[i]));
+  }
+
+  Future<List<WordAttempt>> getHardWords() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'word_attempts',
+      where: 'is_hard = 1',
+    );
+    return List.generate(maps.length, (i) => WordAttempt.fromMap(maps[i]));
+  }
+
+  Future<void> markWordAsHard(String word, String subject) async {
+    final db = await database;
+    await db.update(
+      'word_attempts',
+      {'is_hard': 1},
+      where: 'word = ? AND subject = ?',
+      whereArgs: [word, subject],
+    );
+  }
+
+  // Word Schedules operations
+  Future<void> insertWordSchedule(WordSchedule schedule) async {
+    final db = await database;
+    await db.insert(
+      'word_schedules',
+      schedule.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<WordSchedule?> getWordSchedule(String word) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'word_schedules',
+      where: 'word = ?',
+      whereArgs: [word],
+    );
+    if (maps.isNotEmpty) {
+      return WordSchedule.fromMap(maps.first);
+    }
+    return null;
+  }
+
+  Future<List<WordSchedule>> getWordsForReview(String date) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'word_schedules',
+      where: 'next_review_date <= ?',
+      whereArgs: [date],
+    );
+    return List.generate(maps.length, (i) => WordSchedule.fromMap(maps[i]));
+  }
+
+  Future<List<WordSchedule>> getHardWordsSchedules() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'word_schedules',
+      where: 'is_hard = 1',
+    );
+    return List.generate(maps.length, (i) => WordSchedule.fromMap(maps[i]));
+  }
+
+  Future<List<WordSchedule>> getAllWordSchedules() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query('word_schedules');
+    return List.generate(maps.length, (i) => WordSchedule.fromMap(maps[i]));
+  }
+
+  Future<void> updateWordSchedule(WordSchedule schedule) async {
+    final db = await database;
+    await db.update(
+      'word_schedules',
+      schedule.toMap(),
+      where: 'word = ?',
+      whereArgs: [schedule.word],
+    );
+  }
+
+  Future<void> deleteWordSchedule(String word) async {
+    final db = await database;
+    await db.delete('word_schedules', where: 'word = ?', whereArgs: [word]);
+  }
+
+  // Subject operations
+  Future<void> renameSubject(String oldName, String newName) async {
+    final db = await database;
+
+    // Update subject name in word_lists
+    await db.update(
+      'word_lists',
+      {'subject': newName},
+      where: 'subject = ?',
+      whereArgs: [oldName],
+    );
+
+    // Update subject name in word_attempts
+    await db.update(
+      'word_attempts',
+      {'subject': newName},
+      where: 'subject = ?',
+      whereArgs: [oldName],
+    );
+
+    // Update subject name in assessment_results
+    if (await _tableExists(db, 'assessment_results')) {
+      await db.update(
+        'assessment_results',
+        {'subject': newName},
+        where: 'subject = ?',
+        whereArgs: [oldName],
+      );
+    }
+
+    // Note: word_schedules table doesn't have subject column
+  }
+
+  // Utility methods
+  Future<void> closeDatabase() async {
+    final db = await database;
+    await db.close();
+  }
+
+  Future<void> clearAllData() async {
+    final db = await database;
+    await db.delete('word_lists');
+    await db.delete('word_attempts');
+    await db.delete('word_schedules');
+  }
+}
