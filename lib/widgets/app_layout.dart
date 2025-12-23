@@ -176,10 +176,6 @@ class _AppLayoutState extends State<AppLayout> {
               icon: Icon(Icons.bar_chart, size: 28),
               label: 'Progress',
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.book, size: 28),
-              label: 'Books',
-            ),
           ],
         ),
       ),

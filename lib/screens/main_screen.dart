@@ -21,7 +21,7 @@ class _MainScreenState extends State<MainScreen> {
     const ProgressScreen(),
   ];
 
-  final List<String> _titles = ['RA', 'Practice', 'Progress', 'Books'];
+  final List<String> _titles = ['RA', 'Practice', 'Progress'];
 
   @override
   Widget build(BuildContext context) {
