@@ -5,7 +5,6 @@ import 'services/word_attempt_service.dart';
 import 'services/spaced_repetition_service.dart';
 import 'services/gamification_service.dart';
 import 'services/local_tts_service.dart';
-import 'services/book_service.dart';
 import 'services/assessment_result_service.dart';
 import 'navigation/app_routes.dart';
 import 'screens/main_screen.dart';
