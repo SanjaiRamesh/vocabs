@@ -1,5 +1,5 @@
-import 'package:sqflite/sqflite.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:sqflite/sqflite.dart'; // For mobile
+import 'package:sqflite_common_ffi/sqflite_ffi.dart'; // For desktop
 import 'package:path/path.dart';
 import 'dart:convert';
 import 'dart:io';
@@ -22,6 +22,7 @@ class DatabaseHelper {
       sqfliteFfiInit();
       databaseFactory = databaseFactoryFfi;
     }
+    // Android/iOS use default sqflite package automatically
   }
 
   Future<Database> get database async {

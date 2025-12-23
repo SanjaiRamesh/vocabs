@@ -20,7 +20,6 @@ void main() async {
   await WordAttemptService.init();
   await SpacedRepetitionService.init();
   await GamificationService.init();
-  await BookService.init();
   await AssessmentResultService.init();
 
   // Initialize TTS service
