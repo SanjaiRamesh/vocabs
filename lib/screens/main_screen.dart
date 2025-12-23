@@ -3,7 +3,6 @@ import '../widgets/app_layout.dart';
 import '../screens/subjects_screen.dart';
 import '../screens/progress_screen.dart';
 import '../screens/todays_practice_screen.dart';
-import '../screens/books_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -20,7 +19,6 @@ class _MainScreenState extends State<MainScreen> {
     const SubjectsScreen(),
     const TodaysPracticeScreen(),
     const ProgressScreen(),
-    const BooksScreen(),
   ];
 
   final List<String> _titles = ['RA', 'Practice', 'Progress', 'Books'];
