@@ -6,6 +6,9 @@ import 'dart:io';
 import '../models/word_list.dart';
 import '../models/word_attempt.dart';
 import '../models/word_schedule.dart';
+import '../models/word_review_plan.dart';
+import '../models/word_review_date.dart';
+import '../models/word_attempt_log.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
@@ -118,6 +121,39 @@ class DatabaseHelper {
       )
     ''');
 
+    // Create word_review_plans table (fixed precomputed schedules)
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS word_review_plans (
+        word TEXT PRIMARY KEY,
+        anchor_date TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      )
+    ''');
+
+    // Create word_review_dates table (all precomputed review dates)
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS word_review_dates (
+        word TEXT NOT NULL,
+        review_date TEXT NOT NULL,
+        step_index INTEGER NOT NULL,
+        PRIMARY KEY (word, review_date),
+        FOREIGN KEY (word) REFERENCES word_review_plans(word)
+      )
+    ''');
+
+    // Create word_attempt_logs table (simplified attempt logging)
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS word_attempt_logs (
+        word TEXT NOT NULL,
+        review_date TEXT NOT NULL,
+        result TEXT NOT NULL,
+        timestamp TEXT NOT NULL,
+        heard_or_typed TEXT NOT NULL,
+        PRIMARY KEY (word, review_date),
+        FOREIGN KEY (word) REFERENCES word_review_plans(word)
+      )
+    ''');
+
     // Create indexes for better performance
     await db.execute('''
       CREATE INDEX idx_word_attempts_word_date ON word_attempts(word, date)
@@ -137,6 +173,15 @@ class DatabaseHelper {
 
     await db.execute('''
       CREATE INDEX idx_assessment_results_date ON assessment_results(date)
+    ''');
+
+    // Create indexes for word review tables
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_word_review_dates_review_date ON word_review_dates(review_date)
+    ''');
+
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_word_attempt_logs_review_date ON word_attempt_logs(review_date)
     ''');
   }
 
@@ -305,25 +350,6 @@ class DatabaseHelper {
     return List.generate(maps.length, (i) => WordAttempt.fromMap(maps[i]));
   }
 
-  Future<List<WordAttempt>> getHardWords() async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      'word_attempts',
-      where: 'is_hard = 1',
-    );
-    return List.generate(maps.length, (i) => WordAttempt.fromMap(maps[i]));
-  }
-
-  Future<void> markWordAsHard(String word, String subject) async {
-    final db = await database;
-    await db.update(
-      'word_attempts',
-      {'is_hard': 1},
-      where: 'word = ? AND subject = ?',
-      whereArgs: [word, subject],
-    );
-  }
-
   // Word Schedules operations
   Future<void> insertWordSchedule(WordSchedule schedule) async {
     final db = await database;
@@ -353,15 +379,6 @@ class DatabaseHelper {
       'word_schedules',
       where: 'next_review_date <= ?',
       whereArgs: [date],
-    );
-    return List.generate(maps.length, (i) => WordSchedule.fromMap(maps[i]));
-  }
-
-  Future<List<WordSchedule>> getHardWordsSchedules() async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      'word_schedules',
-      where: 'is_hard = 1',
     );
     return List.generate(maps.length, (i) => WordSchedule.fromMap(maps[i]));
   }
@@ -431,5 +448,162 @@ class DatabaseHelper {
     await db.delete('word_lists');
     await db.delete('word_attempts');
     await db.delete('word_schedules');
+  }
+
+  // ============ Word Review Plan Operations ============
+
+  Future<void> insertWordReviewPlan(WordReviewPlan plan) async {
+    final db = await database;
+    await db.insert(
+      'word_review_plans',
+      plan.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<WordReviewPlan?> getWordReviewPlan(String word) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'word_review_plans',
+      where: 'word = ?',
+      whereArgs: [word],
+    );
+    if (maps.isNotEmpty) {
+      return WordReviewPlan.fromMap(maps.first);
+    }
+    return null;
+  }
+
+  Future<List<WordReviewPlan>> getAllWordReviewPlans() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query('word_review_plans');
+    return List.generate(maps.length, (i) => WordReviewPlan.fromMap(maps[i]));
+  }
+
+  // ============ Word Review Date Operations ============
+
+  Future<void> insertWordReviewDates(
+    String word,
+    List<WordReviewDate> dates,
+  ) async {
+    final db = await database;
+    final batch = db.batch();
+
+    for (final date in dates) {
+      batch.insert(
+        'word_review_dates',
+        date.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+
+    await batch.commit();
+  }
+
+  Future<List<WordReviewDate>> getWordReviewDates(String word) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'word_review_dates',
+      where: 'word = ?',
+      whereArgs: [word],
+      orderBy: 'step_index ASC',
+    );
+    return List.generate(maps.length, (i) => WordReviewDate.fromMap(maps[i]));
+  }
+
+  Future<List<WordReviewDate>> getWordsWithReviewDue(String date) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'word_review_dates',
+      where: 'review_date = ?',
+      whereArgs: [date],
+      orderBy: 'step_index ASC',
+    );
+    return List.generate(maps.length, (i) => WordReviewDate.fromMap(maps[i]));
+  }
+
+  Future<List<WordReviewDate>> getAllReviewDates() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'word_review_dates',
+      orderBy: 'review_date ASC',
+    );
+    return List.generate(maps.length, (i) => WordReviewDate.fromMap(maps[i]));
+  }
+
+  // ============ Word Attempt Log Operations ============
+
+  Future<void> insertWordAttemptLog(WordAttemptLog attempt) async {
+    final db = await database;
+    await db.insert(
+      'word_attempt_logs',
+      attempt.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.ignore, // Ignore duplicate attempts
+    );
+  }
+
+  Future<WordAttemptLog?> getAttemptForReviewDate(
+    String word,
+    String reviewDate,
+  ) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'word_attempt_logs',
+      where: 'word = ? AND review_date = ?',
+      whereArgs: [word, reviewDate],
+    );
+    if (maps.isNotEmpty) {
+      return WordAttemptLog.fromMap(maps.first);
+    }
+    return null;
+  }
+
+  Future<List<WordAttemptLog>> getWordAttemptLogs(String word) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'word_attempt_logs',
+      where: 'word = ?',
+      whereArgs: [word],
+      orderBy: 'review_date ASC',
+    );
+    return List.generate(maps.length, (i) => WordAttemptLog.fromMap(maps[i]));
+  }
+
+  Future<List<WordAttemptLog>> getAttemptLogsByDate(String date) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'word_attempt_logs',
+      where: 'review_date = ?',
+      whereArgs: [date],
+      orderBy: 'timestamp DESC',
+    );
+    return List.generate(maps.length, (i) => WordAttemptLog.fromMap(maps[i]));
+  }
+
+  Future<List<WordAttemptLog>> getAllAttemptLogs() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'word_attempt_logs',
+      orderBy: 'review_date DESC',
+    );
+    return List.generate(maps.length, (i) => WordAttemptLog.fromMap(maps[i]));
+  }
+
+  // ============ Cleanup Operations ============
+
+  Future<void> deleteWordReviewPlan(String word) async {
+    final db = await database;
+    // Delete associated review dates and attempts
+    await db.delete('word_review_dates', where: 'word = ?', whereArgs: [word]);
+    await db.delete('word_attempt_logs', where: 'word = ?', whereArgs: [word]);
+    // Delete the plan itself
+    await db.delete('word_review_plans', where: 'word = ?', whereArgs: [word]);
+  }
+
+  Future<void> deleteAllReviewData() async {
+    final db = await database;
+    await db.delete('word_attempt_logs');
+    await db.delete('word_review_dates');
+    await db.delete('word_review_plans');
   }
 }

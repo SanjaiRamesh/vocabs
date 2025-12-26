@@ -35,7 +35,9 @@ class _SpacedRepetitionDemoScreenState
 
       // Get all data
       _allSchedules = await SpacedRepetitionService.getAllSchedules();
-      _todaysWords = await SpacedRepetitionService.getWordsForReview(_today);
+      _todaysWords = await SpacedRepetitionService.getWordsForReviewCompat(
+        _today,
+      );
       _hardWords = await SpacedRepetitionService.getHardWords();
       _stats = _calculateStats();
 

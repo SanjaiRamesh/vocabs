@@ -4,7 +4,6 @@ class WordAttempt {
   String result; // "correct", "incorrect", "missed"
   String type; // "auditory", "visual"
   int repetitionStep; // 0-7 for spaced repetition
-  bool isHard;
   String subject;
   String listName;
   String heardOrTyped; // What the child actually heard or typed
@@ -16,7 +15,6 @@ class WordAttempt {
     required this.result,
     required this.type,
     required this.repetitionStep,
-    required this.isHard,
     required this.subject,
     required this.listName,
     required this.heardOrTyped,
@@ -34,7 +32,6 @@ class WordAttempt {
       'result': result,
       'type': type,
       'repetition_step': repetitionStep,
-      'is_hard': isHard ? 1 : 0,
       'subject': subject,
       'list_name': listName,
       'heard_or_typed': heardOrTyped,
@@ -49,7 +46,6 @@ class WordAttempt {
       result: map['result'],
       type: map['type'],
       repetitionStep: map['repetition_step'],
-      isHard: map['is_hard'] == 1,
       subject: map['subject'],
       listName: map['list_name'],
       heardOrTyped: map['heard_or_typed'],

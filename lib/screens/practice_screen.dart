@@ -263,7 +263,6 @@ class _PracticeScreenState extends State<PracticeScreen>
       result: resultType, // Use the passed result type instead of calculating
       type: widget.mode,
       repetitionStep: 0, // Will be updated by spaced repetition service
-      isHard: false, // Will be updated if needed
       subject: widget.wordList.subject,
       listName: widget.wordList.listName,
       heardOrTyped: userAnswer,
@@ -287,7 +286,24 @@ class _PracticeScreenState extends State<PracticeScreen>
     });
 
     await WordAttemptService.saveAttempt(attempt);
-    await SpacedRepetitionService.updateWordSchedule(_currentWord, isCorrect);
+    // Initialize word review plan on first attempt, then log the attempt
+    final existingPlan = await SpacedRepetitionService.getWordReviewPlan(
+      _currentWord,
+    );
+    if (existingPlan == null) {
+      await SpacedRepetitionService.initializeWordReviewPlan(
+        _currentWord,
+        today,
+      );
+    }
+
+    // Log the attempt (only first attempt on this date is recorded)
+    await SpacedRepetitionService.logWordAttempt(
+      _currentWord,
+      today,
+      isCorrect ? 'correct' : 'incorrect',
+      userAnswer,
+    );
 
     // Process gamification rewards for correct answers
     if (isCorrect) {

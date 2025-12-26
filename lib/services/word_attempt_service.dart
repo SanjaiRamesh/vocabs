@@ -58,14 +58,6 @@ class WordAttemptService {
     return attempts.first;
   }
 
-  static Future<List<WordAttempt>> getHardWords() async {
-    return await _databaseHelper.getHardWords();
-  }
-
-  static Future<void> markWordAsHard(String word, String subject) async {
-    await _databaseHelper.markWordAsHard(word, subject);
-  }
-
   static Future<Map<String, dynamic>> getProgressStats(String subject) async {
     final attempts = await getAttemptsBySubject(subject);
 
@@ -103,7 +95,6 @@ class WordAttemptService {
         result: 'correct',
         type: 'auditory',
         repetitionStep: 0,
-        isHard: false,
         subject: 'English',
         listName: 'V1 - Basic Words',
         heardOrTyped: 'find',
@@ -114,7 +105,6 @@ class WordAttemptService {
         result: 'correct',
         type: 'visual',
         repetitionStep: 1,
-        isHard: false,
         subject: 'English',
         listName: 'V1 - Basic Words',
         heardOrTyped: 'find',
@@ -125,7 +115,6 @@ class WordAttemptService {
         result: 'incorrect',
         type: 'auditory',
         repetitionStep: 2,
-        isHard: true,
         subject: 'English',
         listName: 'V1 - Basic Words',
         heardOrTyped: 'fond',
@@ -136,7 +125,6 @@ class WordAttemptService {
         result: 'correct',
         type: 'auditory',
         repetitionStep: 0,
-        isHard: false,
         subject: 'English',
         listName: 'V1 - Basic Words',
         heardOrTyped: 'put',
@@ -147,7 +135,6 @@ class WordAttemptService {
         result: 'missed',
         type: 'visual',
         repetitionStep: 1,
-        isHard: false,
         subject: 'English',
         listName: 'V1 - Basic Words',
         heardOrTyped: '',
@@ -158,7 +145,6 @@ class WordAttemptService {
         result: 'correct',
         type: 'visual',
         repetitionStep: 0,
-        isHard: false,
         subject: 'English',
         listName: 'V1 - Basic Words',
         heardOrTyped: 'what',
@@ -170,7 +156,6 @@ class WordAttemptService {
         result: 'correct',
         type: 'auditory',
         repetitionStep: 0,
-        isHard: false,
         subject: 'Math',
         listName: 'Numbers',
         heardOrTyped: 'one',
@@ -181,7 +166,6 @@ class WordAttemptService {
         result: 'correct',
         type: 'visual',
         repetitionStep: 1,
-        isHard: false,
         subject: 'Math',
         listName: 'Numbers',
         heardOrTyped: 'one',
@@ -192,7 +176,6 @@ class WordAttemptService {
         result: 'incorrect',
         type: 'auditory',
         repetitionStep: 0,
-        isHard: false,
         subject: 'Math',
         listName: 'Numbers',
         heardOrTyped: 'too',
@@ -204,7 +187,6 @@ class WordAttemptService {
         result: 'correct',
         type: 'visual',
         repetitionStep: 0,
-        isHard: false,
         subject: 'Science',
         listName: 'Lesson 1 - Basic Science',
         heardOrTyped: 'atom',
@@ -215,7 +197,6 @@ class WordAttemptService {
         result: 'correct',
         type: 'auditory',
         repetitionStep: 1,
-        isHard: false,
         subject: 'Science',
         listName: 'Lesson 1 - Basic Science',
         heardOrTyped: 'atom',
@@ -226,7 +207,6 @@ class WordAttemptService {
         result: 'missed',
         type: 'visual',
         repetitionStep: 0,
-        isHard: false,
         subject: 'Science',
         listName: 'Lesson 1 - Basic Science',
         heardOrTyped: '',
