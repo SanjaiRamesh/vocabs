@@ -1,6 +1,7 @@
 import 'assessment_result.dart';
 import '../services/database_helper.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class AssessmentResultService {
   static const String tableName = 'assessment_results';
@@ -31,6 +32,7 @@ class AssessmentResultService {
   }
 
   static Future<void> init() async {
+    if (kIsWeb) return; // Web doesn't support SQLite
     // Database initialization is handled by DatabaseHelper
     await DatabaseHelper().database;
   }

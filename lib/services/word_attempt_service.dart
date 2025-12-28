@@ -1,23 +1,38 @@
 import '../models/word_attempt.dart';
 import 'database_helper.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class WordAttemptService {
   static final DatabaseHelper _databaseHelper = DatabaseHelper();
+  
+  // In-memory storage for web platform
+  static final List<WordAttempt> _webAttempts = [];
 
   static Future<void> init() async {
+    if (kIsWeb) {
+      return; // Web doesn't support SQLite
+    }
     // Initialize database - no need for adapters with SQLite
     await _databaseHelper.database;
   }
 
   static Future<void> saveAttempt(WordAttempt attempt) async {
+    if (kIsWeb) {
+      _webAttempts.add(attempt);
+      return;
+    }
     await _databaseHelper.insertWordAttempt(attempt);
   }
 
   static Future<List<WordAttempt>> getAllAttempts() async {
+    if (kIsWeb) return List.from(_webAttempts);
     return await _databaseHelper.getAllWordAttempts();
   }
 
   static Future<List<WordAttempt>> getAttemptsBySubject(String subject) async {
+    if (kIsWeb) {
+      return _webAttempts.where((a) => a.subject == subject).toList();
+    }
     return await _databaseHelper.getWordAttemptsBySubject(subject);
   }
 
@@ -43,6 +58,11 @@ class WordAttemptService {
     String word,
     String date,
   ) async {
+    if (kIsWeb) {
+      return _webAttempts
+          .where((a) => a.word == word && a.date == date)
+          .toList();
+    }
     return await _databaseHelper.getWordAttemptsByWordAndDate(word, date);
   }
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../navigation/app_routes.dart';
 import '../services/word_list_service.dart';
 import '../models/word_list.dart';
@@ -55,9 +56,7 @@ class _SubjectsScreenState extends State<SubjectsScreen> {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (context) => const AdminScreen(),
-                ),
+                MaterialPageRoute(builder: (context) => const AdminScreen()),
               );
             },
             icon: const Icon(Icons.settings),
@@ -119,7 +118,11 @@ class _SubjectsScreenState extends State<SubjectsScreen> {
       ),
       SubjectData(name: 'Math', icon: Icons.calculate, color: Colors.green),
       SubjectData(name: 'Science', icon: Icons.science, color: Colors.purple),
-      SubjectData(name: 'Social', icon: Icons.public, color: Colors.teal), // Changed from Geography to Social
+      SubjectData(
+        name: 'Social',
+        icon: Icons.public,
+        color: Colors.teal,
+      ), // Changed from Geography to Social
     ];
 
     // Combine default subjects with available subjects from database
@@ -190,12 +193,7 @@ class _SubjectsScreenState extends State<SubjectsScreen> {
     ];
 
     // Get default subject names to avoid conflicts
-    final defaultSubjectNames = [
-      'English',
-      'Math',
-      'Science',
-      'Social',
-    ];
+    final defaultSubjectNames = ['English', 'Math', 'Science', 'Social'];
 
     // If this is a default subject, return its predefined color
     final defaultSubjects = [
@@ -255,12 +253,7 @@ class _SubjectsScreenState extends State<SubjectsScreen> {
     ];
 
     // Get default subject names
-    final defaultSubjectNames = [
-      'English',
-      'Math',
-      'Science',
-      'Social',
-    ];
+    final defaultSubjectNames = ['English', 'Math', 'Science', 'Social'];
 
     // If this is a default subject, return its predefined icon
     final defaultSubjects = [
@@ -762,6 +755,96 @@ class _SubjectsScreenState extends State<SubjectsScreen> {
         ),
       );
     }
+  }
+
+  Widget _buildWebMessage() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.web,
+              size: 80,
+              color: Colors.deepPurple.withValues(alpha: 0.7),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'AI Reading Assistant',
+              style: TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.bold,
+                color: Colors.deepPurple,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Web Version',
+              style: TextStyle(
+                fontSize: 24,
+                color: Colors.deepPurple.withValues(alpha: 0.8),
+              ),
+            ),
+            const SizedBox(height: 32),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.9),
+                borderRadius: BorderRadius.circular(15),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  Icon(Icons.info_outline, size: 48, color: Colors.blue),
+                  const SizedBox(height: 16),
+                  Text(
+                    'This app is running in web mode',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Database features are not available on web. Please use the mobile or desktop version for full functionality.',
+                    style: TextStyle(fontSize: 14, color: Colors.black54),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 20),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      // You could add a link to download the app
+                    },
+                    icon: Icon(Icons.download),
+                    label: Text('Download Mobile App'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.deepPurple,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

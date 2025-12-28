@@ -3,6 +3,7 @@ import '../models/word_review_date.dart';
 import '../models/word_attempt_log.dart';
 import '../models/word_schedule.dart';
 import 'database_helper.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class SpacedRepetitionService {
   // Fixed schedule offsets in days
@@ -30,6 +31,7 @@ class SpacedRepetitionService {
   static final DatabaseHelper _databaseHelper = DatabaseHelper();
 
   static Future<void> init() async {
+    if (kIsWeb) return; // Web doesn't support SQLite
     await _databaseHelper.database;
   }
 

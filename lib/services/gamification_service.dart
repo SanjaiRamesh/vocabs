@@ -3,12 +3,14 @@ import '../models/achievement.dart';
 import '../models/shop_item.dart';
 import '../models/user_progress.dart';
 import 'database_helper.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class GamificationService {
   static final DatabaseHelper _databaseHelper = DatabaseHelper();
 
   // Initialize gamification system
   static Future<void> init() async {
+    if (kIsWeb) return; // Web doesn't support SQLite
     await _createTables();
     await _createDefaultAchievements();
     await _createDefaultShopItems();
@@ -18,7 +20,7 @@ class GamificationService {
   // Create database tables
   static Future<void> _createTables() async {
     final db = await _databaseHelper.database;
-    
+
     // Achievements table
     await db.execute('''
       CREATE TABLE IF NOT EXISTS achievements (
@@ -76,9 +78,11 @@ class GamificationService {
   // Create default achievements
   static Future<void> _createDefaultAchievements() async {
     final db = await _databaseHelper.database;
-    
+
     // Check if achievements already exist
-    final count = await db.rawQuery('SELECT COUNT(*) as count FROM achievements');
+    final count = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM achievements',
+    );
     if ((count.first['count'] as int) > 0) return;
 
     final defaultAchievements = [
@@ -119,7 +123,7 @@ class GamificationService {
         requirement: 100,
         rewardAmount: 500,
       ),
-      
+
       // Streak achievements
       Achievement(
         id: 'streak_3',
@@ -207,7 +211,7 @@ class GamificationService {
   // Create default shop items
   static Future<void> _createDefaultShopItems() async {
     final db = await _databaseHelper.database;
-    
+
     // Check if shop items already exist
     final count = await db.rawQuery('SELECT COUNT(*) as count FROM shop_items');
     if ((count.first['count'] as int) > 0) return;
@@ -234,7 +238,7 @@ class GamificationService {
         rarity: 'common',
         animation: 'sway',
       ),
-      
+
       // Pets - Rare
       ShopItem(
         id: 'pet_dragon',
@@ -394,7 +398,7 @@ class GamificationService {
   static Future<void> _saveUserProgress(UserProgress progress) async {
     final db = await _databaseHelper.database;
     progress.updatedAt = DateTime.now();
-    
+
     await db.insert(
       'user_progress',
       progress.toMap(),
@@ -403,12 +407,13 @@ class GamificationService {
   }
 
   // Award coins for correct answer
-  static Future<void> awardCoins(int amount, {String reason = 'Correct answer'}) async {
+  static Future<void> awardCoins(
+    int amount, {
+    String reason = 'Correct answer',
+  }) async {
     final progress = await getUserProgress();
     if (progress != null) {
-      final updatedProgress = progress.copyWith(
-        coins: progress.coins + amount,
-      );
+      final updatedProgress = progress.copyWith(coins: progress.coins + amount);
       await _saveUserProgress(updatedProgress);
     }
   }
@@ -431,7 +436,7 @@ class GamificationService {
       final lastDate = DateTime.parse(progress.lastPracticeDate);
       final todayDate = DateTime.parse(today);
       final difference = todayDate.difference(lastDate).inDays;
-      
+
       if (difference == 1) {
         newStreak = progress.currentStreak + 1;
       } else if (difference > 1) {
@@ -447,17 +452,22 @@ class GamificationService {
     // Update progress
     final updatedProgress = progress.copyWith(
       currentStreak: newStreak,
-      longestStreak: newStreak > progress.longestStreak ? newStreak : progress.longestStreak,
+      longestStreak: newStreak > progress.longestStreak
+          ? newStreak
+          : progress.longestStreak,
       lastPracticeDate: today,
       totalWordsCompleted: progress.totalWordsCompleted + 1,
       totalCorrectAnswers: progress.totalCorrectAnswers + (isCorrect ? 1 : 0),
-      totalIncorrectAnswers: progress.totalIncorrectAnswers + (isCorrect ? 0 : 1),
+      totalIncorrectAnswers:
+          progress.totalIncorrectAnswers + (isCorrect ? 0 : 1),
     );
 
     await _saveUserProgress(updatedProgress);
 
     // Check for new achievements
-    newAchievements.addAll(await _checkWordAchievements(updatedProgress.totalWordsCompleted));
+    newAchievements.addAll(
+      await _checkWordAchievements(updatedProgress.totalWordsCompleted),
+    );
     newAchievements.addAll(await _checkStreakAchievements(newStreak));
     newAchievements.addAll(await _checkPracticeAchievements(updatedProgress));
 
@@ -465,7 +475,9 @@ class GamificationService {
   }
 
   // Check word-based achievements
-  static Future<List<Achievement>> _checkWordAchievements(int totalWords) async {
+  static Future<List<Achievement>> _checkWordAchievements(
+    int totalWords,
+  ) async {
     final wordMilestones = [10, 25, 50, 100, 200, 500, 1000];
     final achievements = <Achievement>[];
 
@@ -499,7 +511,9 @@ class GamificationService {
   }
 
   // Check practice-based achievements
-  static Future<List<Achievement>> _checkPracticeAchievements(UserProgress progress) async {
+  static Future<List<Achievement>> _checkPracticeAchievements(
+    UserProgress progress,
+  ) async {
     final achievements = <Achievement>[];
 
     // Check accuracy achievement
@@ -514,9 +528,12 @@ class GamificationService {
   }
 
   // Unlock achievement
-  static Future<Achievement?> _unlockAchievement(String category, int requirement) async {
+  static Future<Achievement?> _unlockAchievement(
+    String category,
+    int requirement,
+  ) async {
     final db = await _databaseHelper.database;
-    
+
     final result = await db.query(
       'achievements',
       where: 'category = ? AND requirement = ? AND is_unlocked = 0',
@@ -539,7 +556,10 @@ class GamificationService {
 
       // Award coins for achievement
       if (achievement.rewardType == 'coins') {
-        await awardCoins(achievement.rewardAmount, reason: 'Achievement: ${achievement.name}');
+        await awardCoins(
+          achievement.rewardAmount,
+          reason: 'Achievement: ${achievement.name}',
+        );
       }
 
       return unlockedAchievement;
@@ -612,7 +632,7 @@ class GamificationService {
     if (itemResult.isEmpty) return false;
 
     final item = ShopItem.fromMap(itemResult.first);
-    
+
     // Check if user has enough coins
     if (progress.coins < item.price) return false;
 
@@ -624,10 +644,7 @@ class GamificationService {
 
     await db.update(
       'shop_items',
-      {
-        'is_owned': 1,
-        'purchased_at': DateTime.now().toIso8601String(),
-      },
+      {'is_owned': 1, 'purchased_at': DateTime.now().toIso8601String()},
       where: 'id = ?',
       whereArgs: [itemId],
     );
@@ -641,7 +658,7 @@ class GamificationService {
   // Check shop-based achievements
   static Future<void> _checkShopAchievements() async {
     final ownedItems = await getOwnedItems();
-    
+
     if (ownedItems.isNotEmpty) {
       await _unlockAchievement('shop', 1);
     }
@@ -653,7 +670,7 @@ class GamificationService {
   // Equip item
   static Future<void> equipItem(String itemId, String category) async {
     final db = await _databaseHelper.database;
-    
+
     // Unequip all items in category
     await db.update(
       'shop_items',
@@ -674,10 +691,7 @@ class GamificationService {
   // Get equipped items
   static Future<Map<String, ShopItem?>> getEquippedItems() async {
     final db = await _databaseHelper.database;
-    final result = await db.query(
-      'shop_items',
-      where: 'is_equipped = 1',
-    );
+    final result = await db.query('shop_items', where: 'is_equipped = 1');
 
     final equipped = <String, ShopItem?>{
       'pets': null,

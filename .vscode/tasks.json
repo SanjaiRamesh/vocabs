@@ -1,0 +1,64 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Flutter: Run on Android Emulator",
+      "type": "shell",
+      "command": "flutter",
+      "args": [
+        "run"
+      ],
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "Flutter: Clean",
+      "type": "shell",
+      "command": "flutter",
+      "args": [
+        "clean"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Flutter: Get Packages",
+      "type": "shell",
+      "command": "flutter",
+      "args": [
+        "pub",
+        "get"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Flutter: Build APK",
+      "type": "shell",
+      "command": "flutter",
+      "args": [
+        "build",
+        "apk"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Flutter: Hot Reload",
+      "type": "shell",
+      "command": "r",
+      "problemMatcher": []
+    },
+    {
+      "label": "Launch Android Emulator (Pixel 9 Pro)",
+      "type": "shell",
+      "command": "flutter",
+      "args": [
+        "emulators",
+        "--launch",
+        "Pixel_9_Pro"
+      ],
+      "problemMatcher": []
+    }
+  ]
+}

@@ -1,14 +1,19 @@
-import 'package:sqflite/sqflite.dart'; // For mobile
+// For mobile
 import 'package:sqflite_common_ffi/sqflite_ffi.dart'; // For desktop
 import 'package:path/path.dart';
 import 'dart:convert';
-import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../models/word_list.dart';
 import '../models/word_attempt.dart';
 import '../models/word_schedule.dart';
 import '../models/word_review_plan.dart';
 import '../models/word_review_date.dart';
 import '../models/word_attempt_log.dart';
+
+// Conditional import for Platform
+import 'platform_helper.dart'
+    if (dart.library.io) 'platform_helper_io.dart'
+    if (dart.library.html) 'platform_helper_web.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
@@ -20,8 +25,14 @@ class DatabaseHelper {
 
   // Initialize database factory for different platforms
   static Future<void> init() async {
-    if (Platform.isWindows || Platform.isLinux) {
-      // Initialize FFI
+    if (kIsWeb) {
+      // Web doesn't use SQLite - use Hive or IndexedDB instead
+      // For now, skip initialization on web
+      return;
+    }
+
+    if (isDesktopPlatform()) {
+      // Initialize FFI for desktop platforms
       sqfliteFfiInit();
       databaseFactory = databaseFactoryFfi;
     }
@@ -29,16 +40,22 @@ class DatabaseHelper {
   }
 
   Future<Database> get database async {
+    if (kIsWeb) {
+      throw UnsupportedError('Database not supported on web platform');
+    }
     if (_database != null) return _database!;
     _database = await _initDatabase();
     return _database!;
   }
 
   Future<Database> _initDatabase() async {
+    if (kIsWeb) {
+      throw UnsupportedError('Database not supported on web platform');
+    }
     String path = join(await getDatabasesPath(), 'reading_assistant.db');
     return await openDatabase(
       path,
-      version: 2, // Increased version to trigger upgrade
+      version: 3, // Increased version to trigger upgrade
       onCreate: _createDatabase,
       onUpgrade: _upgradeDatabase,
     );
@@ -62,6 +79,33 @@ class DatabaseHelper {
           subject TEXT NOT NULL
         )
       ''');
+    }
+    if (oldVersion < 3) {
+      // Drop and recreate word_attempts table without is_hard column
+      await db.execute('DROP TABLE IF EXISTS word_attempts');
+      await db.execute('''
+      CREATE TABLE word_attempts (
+        id TEXT PRIMARY KEY,
+        word TEXT NOT NULL,
+        date TEXT NOT NULL,
+        result TEXT NOT NULL,
+        type TEXT NOT NULL,
+        repetition_step INTEGER NOT NULL,
+        subject TEXT NOT NULL,
+        list_name TEXT NOT NULL,
+        heard_or_typed TEXT NOT NULL,
+        timestamp TEXT NOT NULL,
+        UNIQUE(word, date, timestamp)
+      )
+    ''');
+
+      // Recreate indexes
+      await db.execute('''
+      CREATE INDEX idx_word_attempts_word_date ON word_attempts(word, date)
+    ''');
+      await db.execute('''
+      CREATE INDEX idx_word_attempts_subject ON word_attempts(subject)
+    ''');
     }
   }
 
@@ -87,7 +131,6 @@ class DatabaseHelper {
         result TEXT NOT NULL,
         type TEXT NOT NULL,
         repetition_step INTEGER NOT NULL,
-        is_hard INTEGER NOT NULL,
         subject TEXT NOT NULL,
         list_name TEXT NOT NULL,
         heard_or_typed TEXT NOT NULL,
@@ -103,8 +146,7 @@ class DatabaseHelper {
         repetition_step INTEGER NOT NULL,
         last_review_date TEXT NOT NULL,
         next_review_date TEXT NOT NULL,
-        incorrect_count INTEGER NOT NULL,
-        is_hard INTEGER NOT NULL
+        incorrect_count INTEGER NOT NULL
       )
     ''');
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'services/database_helper.dart';
 import 'services/word_list_service.dart';
 import 'services/word_attempt_service.dart';
@@ -12,15 +13,23 @@ import 'screens/main_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize database factory for platform-specific SQLite
-  await DatabaseHelper.init();
+  if (!kIsWeb) {
+    // Initialize database factory for platform-specific SQLite (not supported on web)
+    await DatabaseHelper.init();
 
-  // Initialize services (SQLite database will be created automatically)
-  await WordListService.init();
-  await WordAttemptService.init();
-  await SpacedRepetitionService.init();
-  await GamificationService.init();
-  await AssessmentResultService.init();
+    // Initialize services (SQLite database will be created automatically)
+    try {
+      await WordListService.init();
+      await WordAttemptService.init();
+      await SpacedRepetitionService.init();
+      await GamificationService.init();
+      await AssessmentResultService.init();
+    } catch (e) {
+      debugPrint('Warning: Failed to initialize database services: $e');
+    }
+  } else {
+    debugPrint('Running on web - database services disabled');
+  }
 
   // Initialize TTS service
   try {
@@ -31,8 +40,14 @@ void main() async {
     // Continue anyway - the service will handle fallbacks
   }
 
-  // Create default word lists if none exist
-  await WordListService.createDefaultWordLists();
+  // Create default word lists if none exist (only for non-web platforms)
+  if (!kIsWeb) {
+    try {
+      await WordListService.createDefaultWordLists();
+    } catch (e) {
+      debugPrint('Warning: Failed to create default word lists: $e');
+    }
+  }
 
   runApp(const MyApp());
 }
