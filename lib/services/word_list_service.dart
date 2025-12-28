@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 
 class WordListService {
   static final DatabaseHelper _databaseHelper = DatabaseHelper();
-  
+
   // In-memory storage for web platform
   static final List<WordList> _webWordLists = [];
   static bool _webInitialized = false;

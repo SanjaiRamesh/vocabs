@@ -3,8 +3,6 @@ import '../models/word_attempt.dart';
 import '../services/word_attempt_service.dart';
 import '../services/word_list_service.dart';
 import '../services/spaced_repetition_service.dart';
-import '../navigation/app_routes.dart';
-import '../widgets/tts_test_widget.dart';
 
 class ProgressScreen extends StatefulWidget {
   const ProgressScreen({super.key});
@@ -94,43 +92,6 @@ class _ProgressScreenState extends State<ProgressScreen>
     }
   }
 
-  Future<void> _generateSampleData() async {
-    try {
-      await WordAttemptService.generateSampleData();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Sample data generated successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        _loadProgressData(); // Refresh the data
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error generating sample data: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  void _showTtsTestDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        backgroundColor: Colors.transparent,
-        child: Container(
-          constraints: const BoxConstraints(maxHeight: 600, maxWidth: 500),
-          child: const TtsTestWidget(),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -146,29 +107,7 @@ class _ProgressScreenState extends State<ProgressScreen>
         ),
         backgroundColor: const Color(0xFF6B73FF),
         elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.record_voice_over, color: Colors.white),
-            onPressed: _showTtsTestDialog,
-            tooltip: 'TTS Service Test',
-          ),
-          IconButton(
-            icon: const Icon(Icons.schedule, color: Colors.white),
-            onPressed: () =>
-                NavigationHelper.navigateToSpacedRepetitionDemo(context),
-            tooltip: 'Spaced Repetition Demo',
-          ),
-          IconButton(
-            icon: const Icon(Icons.bug_report, color: Colors.white),
-            onPressed: _generateSampleData,
-            tooltip: 'Generate Sample Data (Debug)',
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white),
-            onPressed: _loadProgressData,
-            tooltip: 'Refresh Data',
-          ),
-        ],
+        actions: [],
       ),
       body: isLoading
           ? const Center(

@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 
 class WordAttemptService {
   static final DatabaseHelper _databaseHelper = DatabaseHelper();
-  
+
   // In-memory storage for web platform
   static final List<WordAttempt> _webAttempts = [];
 

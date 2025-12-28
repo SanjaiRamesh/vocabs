@@ -4,7 +4,6 @@ import '../screens/subject_word_lists_screen.dart';
 import '../screens/practice_screen.dart';
 import '../screens/progress_screen.dart';
 import '../screens/word_list_editor_screen.dart';
-import '../screens/spaced_repetition_demo_screen.dart';
 
 class AppRoutes {
   static const String home = '/';
@@ -12,7 +11,6 @@ class AppRoutes {
   static const String practice = '/practice';
   static const String progress = '/progress';
   static const String wordListEditor = '/word-list-editor';
-  static const String spacedRepetitionDemo = '/spaced-repetition-demo';
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -45,11 +43,6 @@ class AppRoutes {
             subject: args?['subject'],
             listId: args?['listId'],
           ),
-        );
-
-      case spacedRepetitionDemo:
-        return MaterialPageRoute(
-          builder: (_) => const SpacedRepetitionDemoScreen(),
         );
 
       default:
@@ -97,9 +90,5 @@ class NavigationHelper {
       AppRoutes.wordListEditor,
       arguments: {'subject': subject, 'listId': listId},
     ).then((result) => result as bool?);
-  }
-
-  static void navigateToSpacedRepetitionDemo(BuildContext context) {
-    Navigator.pushNamed(context, AppRoutes.spacedRepetitionDemo);
   }
 }

@@ -185,13 +185,13 @@ class _TodaysPracticeScreenState extends State<TodaysPracticeScreen> {
   Future<void> _startSubjectPractice(String subject, String mode) async {
     final navigator = Navigator.of(context);
     final scaffoldMessenger = ScaffoldMessenger.of(context);
-    
+
     navigator.pop(); // Close bottom sheet
-    
+
     try {
       // Get all word lists for the selected subject
       final wordLists = await WordListService.getWordListsBySubject(subject);
-      
+
       if (wordLists.isEmpty) {
         if (mounted) {
           scaffoldMessenger.showSnackBar(
@@ -321,11 +321,7 @@ class _TodaysPracticeScreenState extends State<TodaysPracticeScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
             child: Row(
               children: [
-                Icon(
-                  Icons.calendar_month,
-                  size: 28,
-                  color: Colors.deepPurple,
-                ),
+                Icon(Icons.calendar_month, size: 28, color: Colors.deepPurple),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
@@ -346,9 +342,7 @@ class _TodaysPracticeScreenState extends State<TodaysPracticeScreen> {
           ),
           Divider(height: 1, color: Colors.grey.shade200),
           // Calendar widget
-          Expanded(
-            child: _buildCalendarWidget(),
-          ),
+          Expanded(child: _buildCalendarWidget()),
         ],
       ),
     );
@@ -392,8 +386,10 @@ class _TodaysPracticeScreenState extends State<TodaysPracticeScreen> {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final firstDayOfMonth = DateTime(today.year, today.month, 1);
-    final startDate = firstDayOfMonth.subtract(Duration(days: firstDayOfMonth.weekday % 7));
-    
+    final startDate = firstDayOfMonth.subtract(
+      Duration(days: firstDayOfMonth.weekday % 7),
+    );
+
     return Column(
       children: [
         // Month/Year header
@@ -418,20 +414,22 @@ class _TodaysPracticeScreenState extends State<TodaysPracticeScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Row(
             children: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-                .map((day) => Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: Text(
-                          day,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey.shade600,
-                            fontSize: 12,
-                          ),
+                .map(
+                  (day) => Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Text(
+                        day,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey.shade600,
+                          fontSize: 12,
                         ),
                       ),
-                    ))
+                    ),
+                  ),
+                )
                 .toList(),
           ),
         ),
@@ -450,20 +448,24 @@ class _TodaysPracticeScreenState extends State<TodaysPracticeScreen> {
               itemBuilder: (context, index) {
                 final date = startDate.add(Duration(days: index));
                 final dateKey = date.toIso8601String().split('T')[0];
-                final hasReviews = calendarData.containsKey(dateKey) && 
-                                 calendarData[dateKey]!.isNotEmpty;
-                final isToday = date.day == today.day && 
-                               date.month == today.month && 
-                               date.year == today.year;
+                final hasReviews =
+                    calendarData.containsKey(dateKey) &&
+                    calendarData[dateKey]!.isNotEmpty;
+                final isToday =
+                    date.day == today.day &&
+                    date.month == today.month &&
+                    date.year == today.year;
                 final isCurrentMonth = date.month == today.month;
 
                 return GestureDetector(
-                  onTap: hasReviews ? () => _showDateDetails(date, calendarData[dateKey]!) : null,
+                  onTap: hasReviews
+                      ? () => _showDateDetails(date, calendarData[dateKey]!)
+                      : null,
                   child: Container(
                     decoration: BoxDecoration(
                       color: _getDateColor(isToday, hasReviews, isCurrentMonth),
                       borderRadius: BorderRadius.circular(8),
-                      border: isToday 
+                      border: isToday
                           ? Border.all(color: Colors.deepPurple, width: 2)
                           : null,
                     ),
@@ -474,8 +476,14 @@ class _TodaysPracticeScreenState extends State<TodaysPracticeScreen> {
                           '${date.day}',
                           style: TextStyle(
                             fontSize: 14,
-                            fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
-                            color: _getDateTextColor(isToday, hasReviews, isCurrentMonth),
+                            fontWeight: isToday
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                            color: _getDateTextColor(
+                              isToday,
+                              hasReviews,
+                              isCurrentMonth,
+                            ),
                           ),
                         ),
                         if (hasReviews) ...[
@@ -523,9 +531,11 @@ class _TodaysPracticeScreenState extends State<TodaysPracticeScreen> {
           decoration: BoxDecoration(
             color: color,
             borderRadius: BorderRadius.circular(4),
-            border: isToday ? Border.all(color: Colors.deepPurple, width: 2) : null,
+            border: isToday
+                ? Border.all(color: Colors.deepPurple, width: 2)
+                : null,
           ),
-          child: isToday 
+          child: isToday
               ? Center(
                   child: Container(
                     width: 4,
@@ -539,10 +549,7 @@ class _TodaysPracticeScreenState extends State<TodaysPracticeScreen> {
               : null,
         ),
         const SizedBox(width: 6),
-        Text(
-          label,
-          style: const TextStyle(fontSize: 12, color: Colors.grey),
-        ),
+        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
       ],
     );
   }
@@ -563,8 +570,18 @@ class _TodaysPracticeScreenState extends State<TodaysPracticeScreen> {
 
   String _getMonthName(int month) {
     const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
     ];
     return months[month - 1];
   }
@@ -589,22 +606,25 @@ class _TodaysPracticeScreenState extends State<TodaysPracticeScreen> {
     }
   }
 
-  Future<void> _showDateDetails(DateTime date, List<WordSchedule> schedules) async {
+  Future<void> _showDateDetails(
+    DateTime date,
+    List<WordSchedule> schedules,
+  ) async {
     // Group schedules by subject
     final Map<String, List<WordSchedule>> subjectSchedules = {};
-    
+
     for (final schedule in schedules) {
       // Get the subject for this word by finding it in word lists
       final wordLists = await WordListService.getAllWordLists();
       String? wordSubject;
-      
+
       for (final wordList in wordLists) {
         if (wordList.words.contains(schedule.word)) {
           wordSubject = wordList.subject;
           break;
         }
       }
-      
+
       if (wordSubject != null) {
         if (!subjectSchedules.containsKey(wordSubject)) {
           subjectSchedules[wordSubject] = [];
@@ -618,14 +638,18 @@ class _TodaysPracticeScreenState extends State<TodaysPracticeScreen> {
         context: context,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
-        builder: (context) => _buildDateDetailsBottomSheet(date, subjectSchedules),
+        builder: (context) =>
+            _buildDateDetailsBottomSheet(date, subjectSchedules),
       );
     }
   }
 
-  Widget _buildDateDetailsBottomSheet(DateTime date, Map<String, List<WordSchedule>> subjectSchedules) {
+  Widget _buildDateDetailsBottomSheet(
+    DateTime date,
+    Map<String, List<WordSchedule>> subjectSchedules,
+  ) {
     final dateStr = '${date.day} ${_getMonthName(date.month)} ${date.year}';
-    
+
     return Container(
       height: MediaQuery.of(context).size.height * 0.7,
       decoration: const BoxDecoration(
@@ -649,11 +673,7 @@ class _TodaysPracticeScreenState extends State<TodaysPracticeScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
             child: Row(
               children: [
-                Icon(
-                  Icons.calendar_today,
-                  size: 28,
-                  color: Colors.deepPurple,
-                ),
+                Icon(Icons.calendar_today, size: 28, color: Colors.deepPurple),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -709,12 +729,15 @@ class _TodaysPracticeScreenState extends State<TodaysPracticeScreen> {
                     ),
                   )
                 : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 8,
+                    ),
                     itemCount: subjectSchedules.length,
                     itemBuilder: (context, index) {
                       final subject = subjectSchedules.keys.elementAt(index);
                       final schedules = subjectSchedules[subject]!;
-                      
+
                       return Card(
                         margin: const EdgeInsets.only(bottom: 12),
                         elevation: 2,
@@ -746,18 +769,29 @@ class _TodaysPracticeScreenState extends State<TodaysPracticeScreen> {
                           ),
                           children: [
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
+                              ),
                               child: Wrap(
                                 spacing: 8,
                                 runSpacing: 8,
-                                children: schedules.map((schedule) => Chip(
-                                  label: Text(
-                                    schedule.word,
-                                    style: const TextStyle(fontSize: 12),
-                                  ),
-                                  backgroundColor: _getSubjectColor(subject).withValues(alpha: 0.2),
-                                  side: BorderSide(color: _getSubjectColor(subject)),
-                                )).toList(),
+                                children: schedules
+                                    .map(
+                                      (schedule) => Chip(
+                                        label: Text(
+                                          schedule.word,
+                                          style: const TextStyle(fontSize: 12),
+                                        ),
+                                        backgroundColor: _getSubjectColor(
+                                          subject,
+                                        ).withValues(alpha: 0.2),
+                                        side: BorderSide(
+                                          color: _getSubjectColor(subject),
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
                               ),
                             ),
                             // Practice button for this subject
@@ -767,14 +801,24 @@ class _TodaysPracticeScreenState extends State<TodaysPracticeScreen> {
                                 children: [
                                   Expanded(
                                     child: ElevatedButton.icon(
-                                      onPressed: () => _startSubjectPracticeFromCalendar(subject, schedules, 'visual'),
-                                      icon: const Icon(Icons.visibility, size: 18),
+                                      onPressed: () =>
+                                          _startSubjectPracticeFromCalendar(
+                                            subject,
+                                            schedules,
+                                            'visual',
+                                          ),
+                                      icon: const Icon(
+                                        Icons.visibility,
+                                        size: 18,
+                                      ),
                                       label: const Text('Visual Practice'),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: Colors.green,
                                         foregroundColor: Colors.white,
                                         shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(8),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -782,14 +826,21 @@ class _TodaysPracticeScreenState extends State<TodaysPracticeScreen> {
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: ElevatedButton.icon(
-                                      onPressed: () => _startSubjectPracticeFromCalendar(subject, schedules, 'auditory'),
+                                      onPressed: () =>
+                                          _startSubjectPracticeFromCalendar(
+                                            subject,
+                                            schedules,
+                                            'auditory',
+                                          ),
                                       icon: const Icon(Icons.hearing, size: 18),
                                       label: const Text('Auditory Practice'),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: Colors.purple,
                                         foregroundColor: Colors.white,
                                         shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(8),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -808,14 +859,18 @@ class _TodaysPracticeScreenState extends State<TodaysPracticeScreen> {
     );
   }
 
-  Future<void> _startSubjectPracticeFromCalendar(String subject, List<WordSchedule> schedules, String mode) async {
+  Future<void> _startSubjectPracticeFromCalendar(
+    String subject,
+    List<WordSchedule> schedules,
+    String mode,
+  ) async {
     Navigator.pop(context); // Close date details
     Navigator.pop(context); // Close calendar
 
     try {
       // Create a word list from the scheduled words
       final words = schedules.map((schedule) => schedule.word).toList();
-      
+
       if (words.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -901,7 +956,9 @@ class _TodaysPracticeScreenState extends State<TodaysPracticeScreen> {
                           ),
                           tooltip: 'Review Calendar',
                           style: IconButton.styleFrom(
-                            backgroundColor: Colors.white.withValues(alpha: 0.7),
+                            backgroundColor: Colors.white.withValues(
+                              alpha: 0.7,
+                            ),
                             padding: const EdgeInsets.all(12),
                           ),
                         ),
@@ -1272,84 +1329,6 @@ class _TodaysPracticeScreenState extends State<TodaysPracticeScreen> {
                         ),
                       ),
                     ],
-
-                    const SizedBox(height: 32),
-
-                    // Refresh button
-                    Center(
-                      child: Wrap(
-                        spacing: 16,
-                        children: [
-                          ElevatedButton.icon(
-                            onPressed: () {
-                              setState(() {
-                                _isLoading = true;
-                              });
-                              _loadTodaysWords();
-                            },
-                            icon: const Icon(Icons.refresh),
-                            label: const Text(
-                              'Refresh',
-                              style: TextStyle(fontFamily: 'OpenDyslexic'),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.blue,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 20,
-                                vertical: 12,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(25),
-                              ),
-                            ),
-                          ),
-                          // Debug button to generate sample data
-                          ElevatedButton.icon(
-                            onPressed: () async {
-                              setState(() {
-                                _isLoading = true;
-                              });
-
-                              // Capture context before async operation
-                              final scaffoldMessenger = ScaffoldMessenger.of(
-                                context,
-                              );
-
-                              await WordAttemptService.generateSampleData();
-                              await _loadTodaysWords();
-
-                              if (mounted) {
-                                scaffoldMessenger.showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Sample schedule data generated!',
-                                    ),
-                                    backgroundColor: Colors.green,
-                                  ),
-                                );
-                              }
-                            },
-                            icon: const Icon(Icons.data_object),
-                            label: const Text(
-                              'Add Sample Data',
-                              style: TextStyle(fontFamily: 'OpenDyslexic'),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.orange,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 20,
-                                vertical: 12,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(25),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                   ],
                 ),
               ),
