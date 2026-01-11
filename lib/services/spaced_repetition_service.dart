@@ -8,24 +8,24 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 class SpacedRepetitionService {
   // Fixed schedule offsets in days
   static const List<int> _scheduleOffsets = [
-    1,
-    2,
-    3,
-    4,
-    5,
-    6,
-    8,
-    9,
-    10,
-    11,
-    15,
-    16,
-    31,
-    32,
-    60,
-    120,
-    210,
-    390,
+    1, // Day 1:  Review tomorrow
+    2, // Day 2:  Review in 2 days
+    3, // Day 3:  Review in 3 days
+    4, // Day 4:  Review in 4 days
+    5, // Day 5:  Review in 5 days
+    6, // Day 6:  Review in 6 days
+    8, // Day 8:  Review in 8 days
+    9, // Day 9:  Review in 9 days
+    10, // Day 10: Review in 10 days
+    11, // Day 11: Review in 11 days
+    15, // Day 15: Review in 15 days
+    16, // Day 16: Review in 16 days
+    31, // Day 31: Review in 31 days (~1 month)
+    32, // Day 32: Review in 32 days
+    60, // Day 60: Review in 60 days (~2 months)
+    120, // Day 120: Review in 120 days (~4 months)
+    210, // Day 210: Review in 210 days (~7 months)
+    390, // Day 390: Review in 390 days (~13 months)
   ];
 
   static final DatabaseHelper _databaseHelper = DatabaseHelper();
@@ -138,6 +138,29 @@ class SpacedRepetitionService {
 
   // ============ Backward Compatibility Methods ============
   // These methods maintain compatibility with code that uses the old WordSchedule API
+  /// Calculate which repetition step today corresponds to for a word
+  /// Returns the stepIndex (0-17) based on the precomputed review dates
+  static Future<int> getRepetitionStepForDate(String word, String date) async {
+    // Get the review plan to check if this is the anchor date
+    final plan = await getWordReviewPlan(word);
+
+    // If this is the anchor date (first practice), return -1
+    if (plan != null && plan.anchorDate == date) {
+      return -1; // ✅ Not a review, it's initial learning
+    }
+
+    final reviewDates = await getWordReviewDates(word);
+
+    // Find exact match in precomputed review dates
+    for (final reviewDate in reviewDates) {
+      if (reviewDate.reviewDate == date) {
+        return reviewDate.stepIndex; // ✅ Return the correct step (0-17)
+      }
+    }
+
+    // No exact match - return 0 (treating as new/first practice)
+    return -1; // ✅ Changed from 0 to -1
+  }
 
   /// Get word schedule for backward compatibility
   /// Returns a constructed WordSchedule from the review plan

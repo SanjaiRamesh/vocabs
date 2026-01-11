@@ -19,8 +19,27 @@ class _ProgressScreenState extends State<ProgressScreen>
   Map<String, List<WordAttempt>> allAttempts = {};
   bool isLoading = true;
 
-  // Spaced repetition schedule
-  final List<int> repetitionDays = [1, 2, 4, 8, 16, 30, 60, 150];
+  // Spaced repetition schedule - MUST match _scheduleOffsets in SpacedRepetitionService
+  final List<int> repetitionDays = [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    8,
+    9,
+    10,
+    11,
+    15,
+    16,
+    31,
+    32,
+    60,
+    120,
+    210,
+    390,
+  ];
 
   @override
   void initState() {
@@ -107,7 +126,13 @@ class _ProgressScreenState extends State<ProgressScreen>
         ),
         backgroundColor: const Color(0xFF6B73FF),
         elevation: 0,
-        actions: [],
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.bug_report),
+            tooltip: 'Debug Database',
+            onPressed: _showDatabaseDebug,
+          ),
+        ],
       ),
       body: isLoading
           ? const Center(
@@ -314,10 +339,10 @@ class _ProgressScreenState extends State<ProgressScreen>
     final Map<String, String> firstDates = {};
 
     for (String word in words) {
-      final schedule = await SpacedRepetitionService.getWordSchedule(word);
-      if (schedule != null) {
-        // Use lastReviewDate as the first practice date for SQLite version
-        firstDates[word] = schedule.lastReviewDate;
+      // ✅ Get the anchor date from the review plan
+      final plan = await SpacedRepetitionService.getWordReviewPlan(word);
+      if (plan != null) {
+        firstDates[word] = plan.anchorDate; // ✅ Use anchor date
       }
     }
 
@@ -807,29 +832,35 @@ class _ProgressScreenState extends State<ProgressScreen>
     );
   }
 
-  // Helper method to calculate cumulative days from D1 for each step
+  // Helper method to calculate cumulative days from anchor date for each step
   int _calculateCumulativeDays(int stepIndex) {
-    // D1 = 0 days (start), D2 = 1 day, D4 = 3 days, D8 = 7 days, etc.
-    switch (stepIndex) {
-      case 0:
-        return 0; // D1
-      case 1:
-        return 1; // D2 = D1 + 1
-      case 2:
-        return 3; // D4 = D1 + 3
-      case 3:
-        return 7; // D8 = D1 + 7
-      case 4:
-        return 15; // D16 = D1 + 15
-      case 5:
-        return 29; // D30 = D1 + 29
-      case 6:
-        return 59; // D60 = D1 + 59
-      case 7:
-        return 149; // D150 = D1 + 149
-      default:
-        return 0;
+    // Return the actual offset from the schedule - MUST match SpacedRepetitionService._scheduleOffsets
+    const offsets = [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      8,
+      9,
+      10,
+      11,
+      15,
+      16,
+      31,
+      32,
+      60,
+      120,
+      210,
+      390,
+    ];
+
+    if (stepIndex >= 0 && stepIndex < offsets.length) {
+      return offsets[stepIndex];
     }
+
+    return 0;
   }
 
   // Helper method to add days to a date string
@@ -868,4 +899,103 @@ class _ProgressScreenState extends State<ProgressScreen>
     }
     return date;
   }
-}
+
+  Future<void> _showDatabaseDebug() async {
+    try {
+      // Get all attempts
+      final attempts = await WordAttemptService.getAllAttempts();
+
+      // Get review plans
+      final plans = await SpacedRepetitionService.getAllWordReviewPlans();
+
+      // Build debug info
+      final buffer = StringBuffer();
+      buffer.writeln('📊 DATABASE DEBUG INFO\n');
+      buffer.writeln(
+        'Current Date: ${DateTime.now().toIso8601String().split('T')[0]}\n',
+      );
+
+      buffer.writeln('━━━━━━━━━━━━━━━━━━━━━━');
+      buffer.writeln('📋 WORD ATTEMPTS (${attempts.length} total)');
+      buffer.writeln('━━━━━━━━━━━━━━━━━━━━━━\n');
+
+      // Group by word
+      final attemptsByWord = <String, List<WordAttempt>>{};
+      for (final attempt in attempts) {
+        attemptsByWord.putIfAbsent(attempt.word, () => []).add(attempt);
+      }
+
+      for (final word in attemptsByWord.keys.take(10)) {
+        // Show first 10 words
+        buffer.writeln('Word: "$word"');
+        final wordAttempts = attemptsByWord[word]!;
+        wordAttempts.sort((a, b) => a.date.compareTo(b.date));
+
+        for (final attempt in wordAttempts) {
+          buffer.writeln(
+            '  ${attempt.date} | Step: ${attempt.repetitionStep} | Result: ${attempt.result} | Type: ${attempt.type}',
+          );
+        }
+        buffer.writeln();
+      }
+
+      buffer.writeln('\n━━━━━━━━━━━━━━━━━━━━━━');
+      buffer.writeln('📅 REVIEW PLANS (${plans.length} total)');
+      buffer.writeln('━━━━━━━━━━━━━━━━━━━━━━\n');
+
+      for (final plan in plans.take(10)) {
+        // Show first 10 plans
+        buffer.writeln('Word: "${plan.word}"');
+        buffer.writeln('  Anchor Date: ${plan.anchorDate}');
+
+        // Get review dates for this word
+        final reviewDates = await SpacedRepetitionService.getWordReviewDates(
+          plan.word,
+        );
+        buffer.writeln('  Review Dates (${reviewDates.length} total):');
+        for (final rd in reviewDates.take(8)) {
+          // Show first 8 review dates
+          buffer.writeln('    Step ${rd.stepIndex}: ${rd.reviewDate}');
+        }
+        buffer.writeln();
+      }
+
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text(
+              'Database Debug Info',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            content: SizedBox(
+              width: double.maxFinite,
+              height: 500,
+              child: SingleChildScrollView(
+                child: SelectableText(
+                  buffer.toString(),
+                  style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Debug error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+} // ⬅️ This is the final closing brace of _ProgressScreenState class

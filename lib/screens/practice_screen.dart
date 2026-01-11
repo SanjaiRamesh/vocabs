@@ -257,12 +257,29 @@ class _PracticeScreenState extends State<PracticeScreen>
     String resultType,
   ) async {
     final today = DateTime.now().toIso8601String().split('T')[0];
+    // ✅ INITIALIZE REVIEW PLAN FIRST (if this is the first practice)
+    final existingPlan = await SpacedRepetitionService.getWordReviewPlan(
+      _currentWord,
+    );
+    if (existingPlan == null) {
+      await SpacedRepetitionService.initializeWordReviewPlan(
+        _currentWord,
+        today,
+      );
+    }
+
+    // ✅ NOW get the repetition step (after review dates are created)
+    final repetitionStep =
+        await SpacedRepetitionService.getRepetitionStepForDate(
+          _currentWord,
+          today,
+        );
     final attempt = WordAttempt(
       word: _currentWord,
       date: today,
       result: resultType, // Use the passed result type instead of calculating
       type: widget.mode,
-      repetitionStep: 0, // Will be updated by spaced repetition service
+      repetitionStep: repetitionStep, // ✅ Use the calculated step
       subject: widget.wordList.subject,
       listName: widget.wordList.listName,
       heardOrTyped: userAnswer,
@@ -270,6 +287,7 @@ class _PracticeScreenState extends State<PracticeScreen>
 
     // Debug logging
     debugPrint('DEBUG: Recording attempt for word: $_currentWord');
+    debugPrint('DEBUG: Repetition Step: $repetitionStep');
     debugPrint('DEBUG: Mode: ${widget.mode}');
     debugPrint('DEBUG: User answer: $userAnswer');
     debugPrint('DEBUG: Is correct: $isCorrect');
@@ -286,16 +304,6 @@ class _PracticeScreenState extends State<PracticeScreen>
     });
 
     await WordAttemptService.saveAttempt(attempt);
-    // Initialize word review plan on first attempt, then log the attempt
-    final existingPlan = await SpacedRepetitionService.getWordReviewPlan(
-      _currentWord,
-    );
-    if (existingPlan == null) {
-      await SpacedRepetitionService.initializeWordReviewPlan(
-        _currentWord,
-        today,
-      );
-    }
 
     // Log the attempt (only first attempt on this date is recorded)
     await SpacedRepetitionService.logWordAttempt(
