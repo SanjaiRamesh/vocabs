@@ -9,9 +9,13 @@ import 'services/local_tts_service.dart';
 import 'assessment_result_service.dart';
 import 'navigation/app_routes.dart';
 import 'screens/main_screen.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // ✅ INSERT FIREBASE HERE (always first)
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   if (!kIsWeb) {
     // Initialize database factory for platform-specific SQLite (not supported on web)

@@ -55,7 +55,7 @@ class DatabaseHelper {
     String path = join(await getDatabasesPath(), 'reading_assistant.db');
     return await openDatabase(
       path,
-      version: 3, // Increased version to trigger upgrade
+      version: 4, // Increased version to trigger upgrade
       onCreate: _createDatabase,
       onUpgrade: _upgradeDatabase,
     );
@@ -106,6 +106,18 @@ class DatabaseHelper {
       await db.execute('''
       CREATE INDEX idx_word_attempts_subject ON word_attempts(subject)
     ''');
+    }
+    if (oldVersion < 4) {
+      // Add practice_usage_daily table for daily practice time tracking
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS practice_usage_daily (
+          date TEXT NOT NULL,
+          user_local_id TEXT NOT NULL,
+          practice_time_sec INTEGER NOT NULL DEFAULT 0,
+          synced INTEGER NOT NULL DEFAULT 0,
+          PRIMARY KEY (date, user_local_id)
+        )
+      ''');
     }
   }
 
@@ -195,7 +207,16 @@ class DatabaseHelper {
         FOREIGN KEY (word) REFERENCES word_review_plans(word)
       )
     ''');
-
+    // Create practice_usage_daily table
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS practice_usage_daily (
+        date TEXT NOT NULL,
+        user_local_id TEXT NOT NULL,
+        practice_time_sec INTEGER NOT NULL DEFAULT 0,
+        synced INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (date, user_local_id)
+      )
+    ''');
     // Create indexes for better performance
     await db.execute('''
       CREATE INDEX idx_word_attempts_word_date ON word_attempts(word, date)

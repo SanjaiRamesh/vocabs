@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "242979082480",
+    "project_id": "vocabulary-7b44f",
+    "storage_bucket": "vocabulary-7b44f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:242979082480:android:094c204b2c4e1c2d593235",
+        "android_client_info": {
+          "package_name": "com.example.vocabs"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAVX_oQUET4CmmpDm_OzI7P2fzWfFMBQuY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
