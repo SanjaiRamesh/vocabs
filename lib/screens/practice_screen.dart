@@ -10,6 +10,7 @@ import '../services/spaced_repetition_service.dart';
 import '../services/gamification_service.dart';
 import '../services/local_tts_service.dart';
 import '../widgets/gamification_widgets.dart';
+import '../utils/practice_time_tracker.dart';
 
 class PracticeScreen extends StatefulWidget {
   final WordList wordList;
@@ -22,11 +23,13 @@ class PracticeScreen extends StatefulWidget {
 }
 
 class _PracticeScreenState extends State<PracticeScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   late LocalTtsService _ttsService;
   late SpeechToText _speechToText;
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
+
+  PracticeTimeTracker? _practiceTimeTracker;
 
   int _currentWordIndex = 0;
   String _currentWord = '';
@@ -54,7 +57,19 @@ class _PracticeScreenState extends State<PracticeScreen>
 
   @override
   void initState() {
+    WidgetsBinding.instance.addObserver(this);
     super.initState();
+
+    // Initialize and start PracticeTimeTracker
+    final userLocalId =
+        'local_user'; // Replace with actual user ID if available
+    final today = DateTime.now().toIso8601String().split('T')[0];
+    _practiceTimeTracker = PracticeTimeTracker(
+      userLocalId: userLocalId,
+      date: today,
+    );
+    _practiceTimeTracker!.start();
+
     _initializeTTS();
     _initializeSpeechToText();
     _setupAnimations();
@@ -388,6 +403,11 @@ class _PracticeScreenState extends State<PracticeScreen>
     setState(() {
       _rewardNotifications.add(notification);
     });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _practiceTimeTracker?.didChangeAppLifecycleState(state);
   }
 
   void _nextWord() {
@@ -1252,6 +1272,7 @@ class _PracticeScreenState extends State<PracticeScreen>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _visualWordTimer?.cancel();
     _autoRecordTimer?.cancel();
     _countdownTimer?.cancel();
@@ -1259,6 +1280,8 @@ class _PracticeScreenState extends State<PracticeScreen>
     _animationController.dispose();
     _ttsService.stop();
     _speechToText.stop();
+    // Save tracked time before stopping
+    _practiceTimeTracker?.stop();
     super.dispose();
   }
 }
