@@ -10,22 +10,8 @@ class SpacedRepetitionService {
   static const List<int> _scheduleOffsets = [
     1, // Day 1:  Review tomorrow
     2, // Day 2:  Review in 2 days
-    3, // Day 3:  Review in 3 days
-    4, // Day 4:  Review in 4 days
-    5, // Day 5:  Review in 5 days
-    6, // Day 6:  Review in 6 days
-    8, // Day 8:  Review in 8 days
-    9, // Day 9:  Review in 9 days
-    10, // Day 10: Review in 10 days
-    11, // Day 11: Review in 11 days
-    15, // Day 15: Review in 15 days
-    16, // Day 16: Review in 16 days
-    31, // Day 31: Review in 31 days (~1 month)
-    32, // Day 32: Review in 32 days
-    60, // Day 60: Review in 60 days (~2 months)
-    120, // Day 120: Review in 120 days (~4 months)
-    210, // Day 210: Review in 210 days (~7 months)
-    390, // Day 390: Review in 390 days (~13 months)
+    4, // Day 3:  Review in 3 days
+    7, // Day 4:  Review in 4 days
   ];
 
   static final DatabaseHelper _databaseHelper = DatabaseHelper();

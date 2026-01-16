@@ -513,6 +513,16 @@ class DatabaseHelper {
     await db.delete('word_schedules');
   }
 
+  /// Clear all review schedules (plans and dates)
+  /// Use this when changing the schedule configuration
+  Future<void> clearAllReviewSchedules() async {
+    final db = await database;
+    await db.delete('word_review_dates');
+    await db.delete('word_review_plans');
+    await db.delete('word_attempt_logs');
+    debugPrint('✅ Cleared all review schedules, plans, and attempt logs');
+  }
+
   // ============ Word Review Plan Operations ============
 
   Future<void> insertWordReviewPlan(WordReviewPlan plan) async {

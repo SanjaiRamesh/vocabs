@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/word_attempt.dart';
 import '../services/word_attempt_service.dart';
 import '../services/word_list_service.dart';
 import '../services/spaced_repetition_service.dart';
+import '../services/database_helper.dart';
 
 class ProgressScreen extends StatefulWidget {
   const ProgressScreen({super.key});
@@ -18,32 +22,18 @@ class _ProgressScreenState extends State<ProgressScreen>
   Map<String, List<String>> subjectWordLists = {};
   Map<String, List<WordAttempt>> allAttempts = {};
   bool isLoading = true;
+  bool isAdmin = false;
 
-  // Spaced repetition schedule - MUST match _scheduleOffsets in SpacedRepetitionService
-  final List<int> repetitionDays = [
-    1,
-    2,
-    3,
-    4,
-    5,
-    6,
-    8,
-    9,
-    10,
-    11,
-    15,
-    16,
-    31,
-    32,
-    60,
-    120,
-    210,
-    390,
-  ];
+  // Show 30 consecutive days in the progress table
+  final List<int> displayDays = List.generate(30, (index) => index + 1);
+
+  // Scheduled review days from spaced repetition (within 30 days)
+  final List<int> scheduledDays = [1, 2, 4, 7];
 
   @override
   void initState() {
     super.initState();
+    _checkAdminRole();
     _loadProgressData();
   }
 
@@ -53,6 +43,31 @@ class _ProgressScreenState extends State<ProgressScreen>
       _subjectTabController.dispose();
     }
     super.dispose();
+  }
+
+  Future<void> _checkAdminRole() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        setState(() => isAdmin = false);
+        return;
+      }
+
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      if (userDoc.exists) {
+        final role = userDoc.data()?['role'] as String?;
+        setState(() => isAdmin = role == 'admin');
+      } else {
+        setState(() => isAdmin = false);
+      }
+    } catch (e) {
+      debugPrint('Error checking admin role: $e');
+      setState(() => isAdmin = false);
+    }
   }
 
   Future<void> _loadProgressData() async {
@@ -127,6 +142,12 @@ class _ProgressScreenState extends State<ProgressScreen>
         backgroundColor: const Color(0xFF6B73FF),
         elevation: 0,
         actions: [
+          if (isAdmin)
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              tooltip: 'Clear Review Schedules',
+              onPressed: _clearReviewSchedules,
+            ),
           IconButton(
             icon: const Icon(Icons.bug_report),
             tooltip: 'Debug Database',
@@ -376,42 +397,24 @@ class _ProgressScreenState extends State<ProgressScreen>
               ),
             ),
           ),
-          // Repetition step headers
-          ...repetitionDays.map(
+          // Day headers (D1-D30)
+          ...displayDays.map(
             (day) => Container(
               width: 80,
-              padding: const EdgeInsets.all(8), // Reduced padding from 12 to 8
+              padding: const EdgeInsets.all(8),
               decoration: const BoxDecoration(
                 border: Border(
                   right: BorderSide(color: Colors.white, width: 1),
                 ),
               ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min, // Prevent overflow
-                children: [
-                  Text(
-                    'D$day',
-                    style: const TextStyle(
-                      fontSize: 11, // Reduced from 12
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 1), // Reduced from 2
-                  Text(
-                    'Step ${repetitionDays.indexOf(day) + 1}',
-                    style: const TextStyle(
-                      fontSize: 9, // Reduced from 10
-                      color: Colors.white70,
-                    ),
-                  ),
-                  // Show explanation for what the date means
-                  Text(
-                    'from start',
-                    style: const TextStyle(fontSize: 7, color: Colors.white60),
-                  ),
-                ],
+              child: Text(
+                'D$day',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
               ),
             ),
           ),
@@ -425,9 +428,6 @@ class _ProgressScreenState extends State<ProgressScreen>
     List<WordAttempt> wordAttempts,
     String? firstPracticeDate,
   ) {
-    // Sort attempts by repetition step
-    wordAttempts.sort((a, b) => a.repetitionStep.compareTo(b.repetitionStep));
-
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -438,53 +438,53 @@ class _ProgressScreenState extends State<ProgressScreen>
           // Word column
           Container(
             width: 120,
-            padding: const EdgeInsets.all(8), // Reduced padding from 12 to 8
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               border: Border(right: BorderSide(color: Colors.grey[300]!)),
             ),
             child: Text(
               word,
               style: const TextStyle(
-                fontSize: 13, // Reduced from 14
+                fontSize: 13,
                 fontWeight: FontWeight.w500,
                 color: Color(0xFF2D3748),
               ),
-              maxLines: 2, // Allow wrapping to 2 lines
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          // Result cells for each repetition step
-          ...repetitionDays.asMap().entries.map((entry) {
-            final stepIndex = entry.key;
-            final stepDay = entry.value;
-
-            // Calculate expected date for this step
-            String expectedDate = '';
+          // Result cells for each day (D1-D30)
+          ...displayDays.map((dayNumber) {
+            // Calculate the actual date for this day
+            String dayDate = '';
             if (firstPracticeDate != null && firstPracticeDate.isNotEmpty) {
-              // Calculate cumulative days from D1
-              int cumulativeDays = _calculateCumulativeDays(stepIndex);
-              expectedDate = _addDaysToDate(firstPracticeDate, cumulativeDays);
+              // Day 1 = anchor date + 0 days, Day 2 = anchor date + 1 day, etc.
+              dayDate = _addDaysToDate(firstPracticeDate, dayNumber - 1);
             }
 
-            // Get all attempts for this step
-            final stepAttempts = wordAttempts
-                .where((a) => a.repetitionStep == stepIndex)
+            // Check if this is a scheduled review day
+            final isScheduledDay = scheduledDays.contains(dayNumber);
+
+            // Get all attempts that occurred on this date
+            final dayAttempts = wordAttempts
+                .where((a) => a.date == dayDate)
                 .toList();
 
-            // Show last attempt result or empty if none
-            if (stepAttempts.isEmpty) {
-              return _buildEmptyCell(stepDay, expectedDate);
+            // Show empty or filled cell
+            if (dayAttempts.isEmpty) {
+              return _buildEmptyCell(dayNumber, dayDate, isScheduledDay);
             }
 
-            // Sort by date and get the last attempt for this step
-            stepAttempts.sort((a, b) => b.date.compareTo(a.date));
-            final lastAttempt = stepAttempts.first;
+            // Sort by timestamp and get latest attempt
+            dayAttempts.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+            final latestAttempt = dayAttempts.first;
 
             return _buildResultCell(
-              lastAttempt,
-              stepDay,
-              stepAttempts,
-              expectedDate,
+              latestAttempt,
+              dayNumber,
+              dayAttempts,
+              dayDate,
+              isScheduledDay,
             );
           }),
         ],
@@ -492,35 +492,44 @@ class _ProgressScreenState extends State<ProgressScreen>
     );
   }
 
-  Widget _buildEmptyCell(int stepDay, String expectedDate) {
+  Widget _buildEmptyCell(int dayNumber, String dayDate, bool isScheduledDay) {
+    // Scheduled days get a subtle indicator, non-scheduled days are plain grey
+    final backgroundColor = isScheduledDay
+        ? Colors.blue.withValues(alpha: 0.05)
+        : Colors.grey[100]!;
+    final borderColor = isScheduledDay
+        ? Colors.blue.withValues(alpha: 0.2)
+        : Colors.grey[300]!;
+
     return Container(
       width: 80,
-      height: 56, // Reduced from 60 to 56 for more space
+      height: 56,
       decoration: BoxDecoration(
-        color: Colors.grey[200]!,
-        border: Border(right: BorderSide(color: Colors.grey[300]!)),
+        color: backgroundColor,
+        border: Border.all(color: borderColor, width: 1),
       ),
       child: Container(
-        padding: const EdgeInsets.all(2), // Reduced padding from 4 to 2
+        padding: const EdgeInsets.all(2),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min, // Prevent overflow
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              '-',
-              style: TextStyle(
-                fontSize: 12, // Reduced from 14
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[600]!,
+            if (isScheduledDay)
+              Icon(
+                Icons.circle_outlined,
+                size: 12,
+                color: Colors.blue.withValues(alpha: 0.4),
               ),
-            ),
-            // Show expected date if available
-            if (expectedDate.isNotEmpty)
+            // Show date if available
+            if (dayDate.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 2),
                 child: Text(
-                  _formatShortDate(expectedDate),
-                  style: TextStyle(fontSize: 8, color: Colors.grey[500]!),
+                  _formatShortDate(dayDate),
+                  style: TextStyle(
+                    fontSize: 7,
+                    color: isScheduledDay ? Colors.blue[300] : Colors.grey[400],
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -533,41 +542,53 @@ class _ProgressScreenState extends State<ProgressScreen>
 
   Widget _buildResultCell(
     WordAttempt lastAttempt,
-    int stepDay,
-    List<WordAttempt> allStepAttempts,
-    String expectedDate,
+    int dayNumber,
+    List<WordAttempt> allDayAttempts,
+    String dayDate,
+    bool isScheduledDay,
   ) {
     // Group attempts by mode
-    final auditoryAttempts = allStepAttempts
+    final auditoryAttempts = allDayAttempts
         .where((a) => a.type == 'auditory')
         .toList();
-    final visualAttempts = allStepAttempts
+    final visualAttempts = allDayAttempts
         .where((a) => a.type == 'visual')
         .toList();
 
     // Determine background color based on latest attempt result
     Color backgroundColor = Colors.grey[200]!;
     Color textColor = Colors.grey[600]!;
+    Color borderColor = Colors.grey[300]!;
 
-    if (allStepAttempts.isNotEmpty) {
+    if (allDayAttempts.isNotEmpty) {
       // Sort by most recent and get overall result
-      allStepAttempts.sort((a, b) => b.date.compareTo(a.date));
-      final latestAttempt = allStepAttempts.first;
+      allDayAttempts.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+      final latestAttempt = allDayAttempts.first;
 
       switch (latestAttempt.result) {
         case 'correct':
           backgroundColor = Colors.green;
           textColor = Colors.white;
+          borderColor = Colors.green[700]!;
           break;
         case 'incorrect':
           backgroundColor = Colors.red;
           textColor = Colors.white;
+          borderColor = Colors.red[700]!;
           break;
         case 'missed':
           backgroundColor = Colors.orange;
           textColor = Colors.white;
+          borderColor = Colors.orange[700]!;
           break;
       }
+    }
+
+    // For scheduled days: normal border
+    // For non-scheduled days: thicker border to indicate off-schedule practice
+    final borderWidth = isScheduledDay ? 1.0 : 2.0;
+    if (!isScheduledDay) {
+      borderColor = Colors.purple.withValues(alpha: 0.6);
     }
 
     return Container(
@@ -575,14 +596,16 @@ class _ProgressScreenState extends State<ProgressScreen>
       height: 56,
       decoration: BoxDecoration(
         color: backgroundColor,
-        border: Border(right: BorderSide(color: Colors.grey[300]!)),
+        border: Border.all(color: borderColor, width: borderWidth),
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: () => _showModeAttemptDetails(
             lastAttempt.word,
-            stepDay,
+            dayNumber,
+            dayDate,
+            isScheduledDay,
             auditoryAttempts,
             visualAttempts,
           ),
@@ -612,12 +635,12 @@ class _ProgressScreenState extends State<ProgressScreen>
                       color: textColor,
                     ),
                   ),
-                // Show expected date if available
-                if (expectedDate.isNotEmpty)
+                // Show date
+                if (dayDate.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 1),
                     child: Text(
-                      _formatShortDate(expectedDate),
+                      _formatShortDate(dayDate),
                       style: TextStyle(
                         fontSize: 6,
                         color: textColor.withValues(alpha: 0.8),
@@ -636,20 +659,39 @@ class _ProgressScreenState extends State<ProgressScreen>
 
   void _showModeAttemptDetails(
     String word,
-    int stepDay,
+    int dayNumber,
+    String dayDate,
+    bool isScheduledDay,
     List<WordAttempt> auditoryAttempts,
     List<WordAttempt> visualAttempts,
   ) {
+    final scheduleStatus = isScheduledDay ? '(Scheduled)' : '(Off-Schedule)';
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(
-          'Attempts for "$word" - Day $stepDay',
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF2D3748),
-          ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Attempts for "$word" - Day $dayNumber',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF2D3748),
+              ),
+            ),
+            if (dayDate.isNotEmpty)
+              Text(
+                '${_formatFullDate(dayDate)} $scheduleStatus',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isScheduledDay ? Colors.blue : Colors.purple,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+          ],
         ),
         content: SizedBox(
           width: double.maxFinite,
@@ -832,37 +874,6 @@ class _ProgressScreenState extends State<ProgressScreen>
     );
   }
 
-  // Helper method to calculate cumulative days from anchor date for each step
-  int _calculateCumulativeDays(int stepIndex) {
-    // Return the actual offset from the schedule - MUST match SpacedRepetitionService._scheduleOffsets
-    const offsets = [
-      1,
-      2,
-      3,
-      4,
-      5,
-      6,
-      8,
-      9,
-      10,
-      11,
-      15,
-      16,
-      31,
-      32,
-      60,
-      120,
-      210,
-      390,
-    ];
-
-    if (stepIndex >= 0 && stepIndex < offsets.length) {
-      return offsets[stepIndex];
-    }
-
-    return 0;
-  }
-
   // Helper method to add days to a date string
   String _addDaysToDate(String dateString, int days) {
     try {
@@ -898,6 +909,90 @@ class _ProgressScreenState extends State<ProgressScreen>
       // Ignore parsing errors
     }
     return date;
+  }
+
+  Future<void> _clearReviewSchedules() async {
+    // Get current user ID
+    final user = FirebaseAuth.instance.currentUser;
+    final userId = user?.uid ?? 'local_student';
+
+    // Check if migration has already been done for this user
+    final prefs = await SharedPreferences.getInstance();
+    final migrationKey = 'schedule_migration_done_$userId';
+    final alreadyMigrated = prefs.getBool(migrationKey) ?? false;
+
+    if (alreadyMigrated) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Schedules already migrated for this user'),
+            backgroundColor: Colors.blue,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+      return;
+    }
+
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Migrate to New Schedule?'),
+        content: const Text(
+          'This will clear old review schedules for your account '
+          'and use the new 6-step schedule (D1, D2, D4, D7, D21, D30).\n\n'
+          'This is a ONE-TIME operation per user.\n\n'
+          'Word lists and practice history will NOT be affected.\n\n'
+          'Continue?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.green),
+            child: const Text('Migrate'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      final dbHelper = DatabaseHelper();
+      await dbHelper.clearAllReviewSchedules();
+
+      // Mark migration as done for this user
+      await prefs.setBool(migrationKey, true);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              '✅ Schedules migrated successfully! New reviews will use the updated schedule.',
+            ),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 4),
+          ),
+        );
+
+        // Reload the screen
+        _loadProgressData();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error during migration: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _showDatabaseDebug() async {
