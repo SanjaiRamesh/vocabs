@@ -1,9 +1,13 @@
 import '../models/word_attempt.dart';
 import 'database_helper.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'firestore_word_attempt_service.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
+import 'package:firebase_auth/firebase_auth.dart';
 
 class WordAttemptService {
   static final DatabaseHelper _databaseHelper = DatabaseHelper();
+  static final FirestoreWordAttemptService _firestoreService =
+      FirestoreWordAttemptService();
 
   // In-memory storage for web platform
   static final List<WordAttempt> _webAttempts = [];
@@ -21,7 +25,31 @@ class WordAttemptService {
       _webAttempts.add(attempt);
       return;
     }
+
+    // SQLite insert (source of truth)
     await _databaseHelper.insertWordAttempt(attempt);
+
+    // Firestore sync (best effort, non-blocking)
+    try {
+      final studentId = await _getStudentId();
+      await _firestoreService.logAttempt(studentId, attempt);
+    } catch (e) {
+      // Log Firestore failures but don't break the app
+      debugPrint('Firestore sync failed for attempt ${attempt.id}: $e');
+    }
+  }
+
+  /// Gets the current student ID for Firestore storage.
+  /// Uses Firebase Auth user UID if available, otherwise falls back to placeholder.
+  static Future<String> _getStudentId() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      return user.uid;
+    }
+
+    // TODO: Implement fallback logic for unauthenticated users
+    // For now, return a placeholder that can be replaced later
+    return 'local_student';
   }
 
   static Future<List<WordAttempt>> getAllAttempts() async {

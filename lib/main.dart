@@ -9,6 +9,7 @@ import 'services/local_tts_service.dart';
 import 'assessment_result_service.dart';
 import 'navigation/app_routes.dart';
 import 'screens/main_screen.dart';
+import 'screens/dev_login_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 
@@ -67,7 +68,7 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: const MainScreen(),
+      home: DevLoginScreen(), // Change from MainScreen
       onGenerateRoute: AppRoutes.generateRoute,
     );
   }

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/word_list_service.dart';
 import 'network_test_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'dev_login_screen.dart';
 
 class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
@@ -17,6 +19,24 @@ class _AdminScreenState extends State<AdminScreen> {
   void initState() {
     super.initState();
     _loadSubjects();
+  }
+
+  Future<void> _signOut() async {
+    try {
+      await FirebaseAuth.instance.signOut();
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => DevLoginScreen()),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error signing out: $e')));
+      }
+    }
   }
 
   Future<void> _loadSubjects() async {
@@ -208,6 +228,12 @@ class _AdminScreenState extends State<AdminScreen> {
             icon: const Icon(Icons.cleaning_services),
             tooltip:
                 'Quick Cleanup (Remove Art, History, rename Geography→Social)',
+          ),
+          // Sign out button
+          IconButton(
+            onPressed: _signOut,
+            icon: const Icon(Icons.logout),
+            tooltip: 'Sign Out',
           ),
         ],
       ),
