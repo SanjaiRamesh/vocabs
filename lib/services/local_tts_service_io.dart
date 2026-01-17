@@ -9,8 +9,14 @@ import 'package:flutter_sound/flutter_sound.dart';
 import 'platform_helper_io.dart';
 
 class LocalTtsService {
-  static const String _baseUrl = 'http://192.168.31.137:8080';
+  static const String _baseUrl =
+      'https://unsoaked-nonprejudicially-carla.ngrok-free.dev';
+
   static const String _cacheDirectory = 'tts_cache';
+  // Shared header for ngrok requests
+  static const Map<String, String> _ngrokHeaders = {
+    'ngrok-skip-browser-warning': 'true',
+  };
 
   // TTS Configuration for child-friendly voice
   static const String _defaultFormat =
@@ -143,7 +149,9 @@ class LocalTtsService {
 
       debugPrint('TTS Request URL: $uri');
 
-      final response = await http.get(uri).timeout(const Duration(seconds: 5));
+      final response = await http
+          .get(uri, headers: _ngrokHeaders)
+          .timeout(const Duration(seconds: 20));
 
       if (response.statusCode == 200) {
         debugPrint(
@@ -280,7 +288,7 @@ class LocalTtsService {
       debugPrint('Testing connection to TTS service: $_baseUrl');
 
       final response = await http
-          .get(Uri.parse('$_baseUrl/health'))
+          .get(Uri.parse('$_baseUrl/health'), headers: _ngrokHeaders)
           .timeout(const Duration(seconds: 5));
 
       final isAvailable = response.statusCode == 200;
@@ -325,7 +333,7 @@ class LocalTtsService {
     try {
       debugPrint('Testing TTS service health...');
       final response = await http
-          .get(Uri.parse('$_baseUrl/health'))
+          .get(Uri.parse('$_baseUrl/health'), headers: _ngrokHeaders)
           .timeout(const Duration(seconds: 5));
 
       results['tts_service'] = response.statusCode == 200;

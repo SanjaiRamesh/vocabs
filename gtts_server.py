@@ -5,11 +5,13 @@ Provides Indian English text-to-speech for Android devices
 """
 
 from flask import Flask, request, send_file
+from flask_cors import CORS
 from gtts import gTTS
 import tempfile
 import os
 
 app = Flask(__name__)
+CORS(app)  # Enable CORS for all routes
 
 @app.route('/speak', methods=['GET'])
 def speak():
@@ -32,6 +34,9 @@ def speak():
         print(f'✅ Audio generated successfully for: "{text}"')
         
         response = send_file(temp_file.name, as_attachment=False, mimetype='audio/mpeg')
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = '*'
         response.call_on_close(lambda: os.unlink(temp_file.name))
         return response
         
@@ -41,7 +46,10 @@ def speak():
 
 @app.route('/health', methods=['GET'])
 def health():
-    return {'status': 'healthy', 'service': 'gTTS Flask', 'language': 'en-in'}
+    from flask import jsonify
+    response = jsonify({'status': 'healthy', 'service': 'gTTS Flask', 'language': 'en-in'})
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    return response
 
 if __name__ == '__main__':
     print('🎤 gTTS Flask Service Starting...')
