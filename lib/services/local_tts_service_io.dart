@@ -7,9 +7,11 @@ import 'package:flutter_sound/flutter_sound.dart';
 
 // Platform helper
 import 'platform_helper_io.dart';
+import 'app_settings_service.dart';
 
 class LocalTtsService {
-  static const String _baseUrl =
+  // Default fallback URL (can be overridden at runtime via AppSettingsService)
+  static String _baseUrl =
       'https://unsoaked-nonprejudicially-carla.ngrok-free.dev';
 
   static const String _cacheDirectory = 'tts_cache';
@@ -42,6 +44,18 @@ class LocalTtsService {
     if (_isInitialized) return;
 
     try {
+      // Load persisted base URL (if set)
+      try {
+        final configured = await AppSettingsService.getBaseUrl();
+        if (configured != null && configured.trim().isNotEmpty) {
+          _baseUrl = configured.trim();
+          debugPrint('Using configured TTS base URL: $_baseUrl');
+        } else {
+          debugPrint('Using default TTS base URL: $_baseUrl');
+        }
+      } catch (e) {
+        debugPrint('Unable to load configured base URL: $e');
+      }
       // On Windows, disable TTS for now due to compatibility issues
       if (isWindows()) {
         _useSystemTts = true;
@@ -72,6 +86,22 @@ class LocalTtsService {
       debugPrint('Error initializing LocalTtsService: $e');
       // Don't rethrow, just mark as failed and continue
       _isInitialized = false;
+    }
+  }
+
+  /// Get the current base URL in use.
+  static String get baseUrl => _baseUrl;
+
+  /// Update the base URL at runtime and persist via AppSettingsService.
+  static Future<void> setBaseUrl(String url) async {
+    final sanitized = url.trim();
+    if (sanitized.isEmpty) return;
+    _baseUrl = sanitized;
+    try {
+      await AppSettingsService.setBaseUrl(sanitized);
+      debugPrint('Runtime base URL updated: $_baseUrl');
+    } catch (e) {
+      debugPrint('Failed to persist base URL: $e');
     }
   }
 

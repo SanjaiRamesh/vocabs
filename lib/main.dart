@@ -6,6 +6,7 @@ import 'services/word_attempt_service.dart';
 import 'services/spaced_repetition_service.dart';
 import 'services/gamification_service.dart';
 import 'services/local_tts_service.dart';
+import 'services/app_settings_service.dart';
 import 'assessment_result_service.dart';
 import 'navigation/app_routes.dart';
 import 'screens/dev_login_screen.dart';
@@ -16,6 +17,13 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // ✅ INSERT FIREBASE HERE (always first)
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // Initialize app settings (Hive-based)
+  try {
+    await AppSettingsService.init();
+  } catch (e) {
+    debugPrint('Warning: AppSettingsService init failed: $e');
+  }
 
   if (!kIsWeb) {
     // Initialize database factory for platform-specific SQLite (not supported on web)
