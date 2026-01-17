@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:firebase_auth/firebase_auth.dart';
 import '../navigation/app_routes.dart';
 import '../services/word_list_service.dart';
 import '../models/word_list.dart';
@@ -14,6 +15,7 @@ class SubjectsScreen extends StatefulWidget {
 
 class _SubjectsScreenState extends State<SubjectsScreen> {
   List<String> availableSubjects = [];
+  Map<String, int> subjectWordCounts = {};
   bool isLoading = true;
   bool showDeleteButtons = false; // Control visibility of delete buttons
 
@@ -25,9 +27,32 @@ class _SubjectsScreenState extends State<SubjectsScreen> {
 
   Future<void> _loadSubjects() async {
     try {
-      final subjects = await WordListService.getAvailableSubjects();
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        if (mounted) {
+          setState(() {
+            isLoading = false;
+          });
+        }
+        return;
+      }
+
+      final wordLists = await WordListService.getAllWordLists(user.uid);
+
+      final counts = <String, int>{};
+      for (final list in wordLists) {
+        counts[list.subject] = (counts[list.subject] ?? 0) + list.words.length;
+      }
+
+      final subjects =
+          counts.entries
+              .where((entry) => entry.value > 0)
+              .map((entry) => entry.key)
+              .toList()
+            ..sort();
       setState(() {
         availableSubjects = subjects;
+        subjectWordCounts = counts;
         isLoading = false;
       });
     } catch (e) {
@@ -53,11 +78,14 @@ class _SubjectsScreenState extends State<SubjectsScreen> {
         actions: [
           // Admin button
           IconButton(
-            onPressed: () {
-              Navigator.push(
+            onPressed: () async {
+              // Navigate to admin screen
+              await Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const AdminScreen()),
               );
+              // Reload subjects when returning from admin screen
+              _loadSubjects();
             },
             icon: const Icon(Icons.settings),
             color: Colors.deepPurple,
@@ -125,12 +153,16 @@ class _SubjectsScreenState extends State<SubjectsScreen> {
       ), // Changed from Geography to Social
     ];
 
+    final filteredDefaultSubjects = defaultSubjects
+        .where((subject) => (subjectWordCounts[subject.name] ?? 0) > 0)
+        .toList();
+
     // Combine default subjects with available subjects from database
     final allSubjects = <SubjectData>[];
     final subjectNames = <String>{};
 
     // Add default subjects
-    for (final defaultSubject in defaultSubjects) {
+    for (final defaultSubject in filteredDefaultSubjects) {
       allSubjects.add(defaultSubject);
       subjectNames.add(defaultSubject.name);
     }
@@ -344,6 +376,7 @@ class _SubjectsScreenState extends State<SubjectsScreen> {
                   : null,
             ),
             child: Stack(
+              alignment: Alignment.center,
               children: [
                 Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -506,6 +539,11 @@ class _SubjectsScreenState extends State<SubjectsScreen> {
 
   Future<void> _deleteSubject(String subjectName) async {
     try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw Exception('User not logged in');
+      }
+
       // Show loading indicator
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -527,7 +565,7 @@ class _SubjectsScreenState extends State<SubjectsScreen> {
       }
 
       // Delete the subject and all its word lists
-      await WordListService.deleteSubject(subjectName);
+      await WordListService.deleteSubject(user.uid, subjectName);
 
       // Refresh the subjects list
       await _loadSubjects();
@@ -710,9 +748,15 @@ class _SubjectsScreenState extends State<SubjectsScreen> {
     final messenger = ScaffoldMessenger.of(context);
 
     try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw Exception('User not logged in');
+      }
+
       // Create a new word list for this subject
       final newWordList = WordList(
         id: '${subjectName.toLowerCase()}_${DateTime.now().millisecondsSinceEpoch}',
+        userId: user.uid,
         subject: subjectName,
         listName: listName,
         words: [], // Start with empty list

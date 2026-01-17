@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
 import '../models/word_list.dart';
@@ -46,6 +47,7 @@ class _PracticeScreenState extends State<PracticeScreen>
   int _coinsEarned = 0;
   final List<String> _achievementsUnlocked = [];
   final List<Widget> _rewardNotifications = [];
+  late GlobalKey<State> _gamificationHeaderKey;
 
   // Visual mode variables
   Timer? _visualWordTimer;
@@ -59,6 +61,7 @@ class _PracticeScreenState extends State<PracticeScreen>
   void initState() {
     WidgetsBinding.instance.addObserver(this);
     super.initState();
+    _gamificationHeaderKey = GlobalKey<State>();
 
     // Initialize and start PracticeTimeTracker
     final userLocalId =
@@ -272,12 +275,17 @@ class _PracticeScreenState extends State<PracticeScreen>
     String resultType,
   ) async {
     final today = DateTime.now().toIso8601String().split('T')[0];
+    final user = FirebaseAuth.instance.currentUser;
+    final userId = user?.uid ?? 'local_student';
+
     // ✅ INITIALIZE REVIEW PLAN FIRST (if this is the first practice)
     final existingPlan = await SpacedRepetitionService.getWordReviewPlan(
+      userId,
       _currentWord,
     );
     if (existingPlan == null) {
       await SpacedRepetitionService.initializeWordReviewPlan(
+        userId,
         _currentWord,
         today,
       );
@@ -286,10 +294,13 @@ class _PracticeScreenState extends State<PracticeScreen>
     // ✅ NOW get the repetition step (after review dates are created)
     final repetitionStep =
         await SpacedRepetitionService.getRepetitionStepForDate(
+          userId,
           _currentWord,
           today,
         );
+
     final attempt = WordAttempt(
+      userId: userId,
       word: _currentWord,
       date: today,
       result: resultType, // Use the passed result type instead of calculating
@@ -322,6 +333,7 @@ class _PracticeScreenState extends State<PracticeScreen>
 
     // Log the attempt (only first attempt on this date is recorded)
     await SpacedRepetitionService.logWordAttempt(
+      userId,
       _currentWord,
       today,
       isCorrect ? 'correct' : 'incorrect',
@@ -338,8 +350,12 @@ class _PracticeScreenState extends State<PracticeScreen>
 
   Future<void> _processGamificationReward() async {
     try {
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId == null) return;
+
       // Update practice statistics and get newly unlocked achievements
       final newAchievements = await GamificationService.updatePracticeStats(
+        userId: userId,
         isCorrect: true,
         totalQuestions: 1,
         correctAnswers: 1,
@@ -351,6 +367,20 @@ class _PracticeScreenState extends State<PracticeScreen>
         _coinsEarned += coinsPerCorrect;
       });
       _showRewardNotification(coinsPerCorrect, 'Correct!');
+
+      // Refresh gamification header to show updated coins
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (mounted) {
+          try {
+            final headerState = _gamificationHeaderKey.currentState as dynamic;
+            if (headerState != null && headerState.refresh is Function) {
+              headerState.refresh();
+            }
+          } catch (e) {
+            debugPrint('Error refreshing gamification header: $e');
+          }
+        }
+      });
 
       // Show achievement notifications for newly unlocked achievements
       for (final achievement in newAchievements) {
@@ -454,268 +484,273 @@ class _PracticeScreenState extends State<PracticeScreen>
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text(
-          'Practice Complete!',
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: Colors.deepPurple,
-            fontFamily: 'OpenDyslexic',
+      barrierDismissible: false, // Prevent tapping outside/behind the dialog
+      builder: (context) => WillPopScope(
+        // Block system back; only dialog buttons close it
+        onWillPop: () async => false,
+        child: AlertDialog(
+          title: const Text(
+            'Practice Complete!',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.deepPurple,
+              fontFamily: 'OpenDyslexic',
+            ),
           ),
-        ),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Summary stats
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.blue.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.blue, width: 2),
-                ),
-                child: Column(
-                  children: [
-                    Text(
-                      'Summary',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue,
-                        fontFamily: 'OpenDyslexic',
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        _buildStatChip('Correct', correctCount, Colors.green),
-                        _buildStatChip('Wrong', incorrectCount, Colors.red),
-                        _buildStatChip('Missed', missedCount, Colors.orange),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Score: $correctCount/$totalWords (${((correctCount / totalWords) * 100).round()}%)',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue,
-                        fontFamily: 'OpenDyslexic',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Gamification rewards summary
-              if (_coinsEarned > 0 || _achievementsUnlocked.isNotEmpty) ...[
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Summary stats
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.amber.withValues(alpha: 0.1),
+                    color: Colors.blue.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.amber, width: 2),
+                    border: Border.all(color: Colors.blue, width: 2),
                   ),
                   child: Column(
                     children: [
-                      const Text(
-                        'Rewards Earned',
-                        style: TextStyle(
-                          fontSize: 18,
+                      Text(
+                        'Summary',
+                        style: const TextStyle(
+                          fontSize: 20,
                           fontWeight: FontWeight.bold,
-                          color: Colors.amber,
+                          color: Colors.blue,
                           fontFamily: 'OpenDyslexic',
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      if (_coinsEarned > 0) ...[
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.monetization_on,
-                              color: Colors.amber.shade700,
-                              size: 24,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              '+$_coinsEarned coins',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.amber.shade800,
-                                fontFamily: 'OpenDyslexic',
-                              ),
-                            ),
-                          ],
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          _buildStatChip('Correct', correctCount, Colors.green),
+                          _buildStatChip('Wrong', incorrectCount, Colors.red),
+                          _buildStatChip('Missed', missedCount, Colors.orange),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Score: $correctCount/$totalWords (${((correctCount / totalWords) * 100).round()}%)',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue,
+                          fontFamily: 'OpenDyslexic',
                         ),
-                        const SizedBox(height: 8),
-                      ],
-                      if (_achievementsUnlocked.isNotEmpty) ...[
-                        const Text(
-                          'New Achievements:',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.deepPurple,
-                            fontFamily: 'OpenDyslexic',
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        ...(_achievementsUnlocked
-                            .map(
-                              (name) => Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 2,
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.emoji_events,
-                                      color: Colors.amber.shade700,
-                                      size: 16,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Flexible(
-                                      child: Text(
-                                        name,
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.deepPurple,
-                                          fontFamily: 'OpenDyslexic',
-                                        ),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            )
-                            .toList()),
-                      ],
+                      ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 16),
-              ],
 
-              // Detailed results
-              const Text(
-                'Details:',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.deepPurple,
-                  fontFamily: 'OpenDyslexic',
-                ),
-              ),
-              const SizedBox(height: 8),
-
-              // Results list
-              SizedBox(
-                height: 200, // Fixed height for scrollable area
-                child: ListView.builder(
-                  itemCount: _practiceResults.length,
-                  itemBuilder: (context, index) {
-                    final result = _practiceResults[index];
-                    Color resultColor;
-                    IconData resultIcon;
-
-                    switch (result['result']) {
-                      case 'correct':
-                        resultColor = Colors.green;
-                        resultIcon = Icons.check_circle;
-                        break;
-                      case 'incorrect':
-                        resultColor = Colors.red;
-                        resultIcon = Icons.cancel;
-                        break;
-                      case 'missed':
-                        resultColor = Colors.orange;
-                        resultIcon = Icons.access_time;
-                        break;
-                      default:
-                        resultColor = Colors.grey;
-                        resultIcon = Icons.help;
-                    }
-
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: resultColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: resultColor, width: 1),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(resultIcon, color: resultColor, size: 20),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Word: ${result['word']}',
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                    fontFamily: 'OpenDyslexic',
-                                  ),
+                // Gamification rewards summary
+                if (_coinsEarned > 0 || _achievementsUnlocked.isNotEmpty) ...[
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.amber, width: 2),
+                    ),
+                    child: Column(
+                      children: [
+                        const Text(
+                          'Rewards Earned',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.amber,
+                            fontFamily: 'OpenDyslexic',
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        if (_coinsEarned > 0) ...[
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.monetization_on,
+                                color: Colors.amber.shade700,
+                                size: 24,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '+$_coinsEarned coins',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.amber.shade800,
+                                  fontFamily: 'OpenDyslexic',
                                 ),
-                                Text(
-                                  'You said: ${result['heard']}',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey[600],
-                                    fontFamily: 'OpenDyslexic',
-                                  ),
-                                ),
-                              ],
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                        ],
+                        if (_achievementsUnlocked.isNotEmpty) ...[
+                          const Text(
+                            'New Achievements:',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.deepPurple,
+                              fontFamily: 'OpenDyslexic',
                             ),
                           ),
+                          const SizedBox(height: 4),
+                          ...(_achievementsUnlocked
+                              .map(
+                                (name) => Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 2,
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.emoji_events,
+                                        color: Colors.amber.shade700,
+                                        size: 16,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Flexible(
+                                        child: Text(
+                                          name,
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.deepPurple,
+                                            fontFamily: 'OpenDyslexic',
+                                          ),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              )
+                              .toList()),
                         ],
-                      ),
-                    );
-                  },
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // Detailed results
+                const Text(
+                  'Details:',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.deepPurple,
+                    fontFamily: 'OpenDyslexic',
+                  ),
                 ),
+                const SizedBox(height: 8),
+
+                // Results list
+                SizedBox(
+                  height: 200, // Fixed height for scrollable area
+                  child: ListView.builder(
+                    itemCount: _practiceResults.length,
+                    itemBuilder: (context, index) {
+                      final result = _practiceResults[index];
+                      Color resultColor;
+                      IconData resultIcon;
+
+                      switch (result['result']) {
+                        case 'correct':
+                          resultColor = Colors.green;
+                          resultIcon = Icons.check_circle;
+                          break;
+                        case 'incorrect':
+                          resultColor = Colors.red;
+                          resultIcon = Icons.cancel;
+                          break;
+                        case 'missed':
+                          resultColor = Colors.orange;
+                          resultIcon = Icons.access_time;
+                          break;
+                        default:
+                          resultColor = Colors.grey;
+                          resultIcon = Icons.help;
+                      }
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: resultColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: resultColor, width: 1),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(resultIcon, color: resultColor, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Word: ${result['word']}',
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: 'OpenDyslexic',
+                                    ),
+                                  ),
+                                  Text(
+                                    'You said: ${result['heard']}',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey[600],
+                                      fontFamily: 'OpenDyslexic',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                Navigator.of(context).pop();
+              },
+              child: const Text(
+                'Done',
+                style: TextStyle(fontSize: 16, fontFamily: 'OpenDyslexic'),
               ),
-            ],
-          ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                setState(() {
+                  _currentWordIndex = 0;
+                  _practiceResults.clear(); // Clear previous results
+                });
+                _startPractice();
+              },
+              child: const Text(
+                'Practice Again',
+                style: TextStyle(fontSize: 16, fontFamily: 'OpenDyslexic'),
+              ),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              Navigator.of(context).pop();
-            },
-            child: const Text(
-              'Done',
-              style: TextStyle(fontSize: 16, fontFamily: 'OpenDyslexic'),
-            ),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              setState(() {
-                _currentWordIndex = 0;
-                _practiceResults.clear(); // Clear previous results
-              });
-              _startPractice();
-            },
-            child: const Text(
-              'Practice Again',
-              style: TextStyle(fontSize: 16, fontFamily: 'OpenDyslexic'),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -769,6 +804,7 @@ class _PracticeScreenState extends State<PracticeScreen>
               Column(
                 children: [
                   _buildHeader(),
+                  GamificationHeader(key: _gamificationHeaderKey),
                   _buildProgressIndicator(),
                   Expanded(child: _buildPracticeContent()),
                 ],

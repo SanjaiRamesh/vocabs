@@ -1,4 +1,5 @@
 class WordAttemptLog {
+  String userId;
   String word;
   String reviewDate; // YYYY-MM-DD, the review date this attempt is for
   String result; // "correct" or "incorrect"
@@ -6,6 +7,7 @@ class WordAttemptLog {
   String heardOrTyped; // What the child actually heard or typed
 
   WordAttemptLog({
+    required this.userId,
     required this.word,
     required this.reviewDate,
     required this.result,
@@ -15,6 +17,7 @@ class WordAttemptLog {
 
   Map<String, dynamic> toMap() {
     return {
+      'user_id': userId,
       'word': word,
       'review_date': reviewDate,
       'result': result,
@@ -25,6 +28,7 @@ class WordAttemptLog {
 
   factory WordAttemptLog.fromMap(Map<String, dynamic> map) {
     return WordAttemptLog(
+      userId: map['user_id'],
       word: map['word'],
       reviewDate: map['review_date'],
       result: map['result'],
@@ -35,6 +39,6 @@ class WordAttemptLog {
 
   @override
   String toString() {
-    return 'WordAttemptLog(word: $word, reviewDate: $reviewDate, result: $result)';
+    return 'WordAttemptLog(userId: $userId, word: $word, reviewDate: $reviewDate, result: $result)';
   }
 }

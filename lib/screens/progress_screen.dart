@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/word_attempt.dart';
@@ -74,13 +73,24 @@ class _ProgressScreenState extends State<ProgressScreen>
     try {
       setState(() => isLoading = true);
 
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        setState(() => isLoading = false);
+        return;
+      }
+
       // Get all subjects
-      final availableSubjects = await WordListService.getAvailableSubjects();
+      final availableSubjects = await WordListService.getAvailableSubjects(
+        user.uid,
+      );
 
       // Get word lists for each subject
       final Map<String, List<String>> wordListsMap = {};
       for (String subject in availableSubjects) {
-        final wordLists = await WordListService.getWordListsBySubject(subject);
+        final wordLists = await WordListService.getWordListsBySubject(
+          user.uid,
+          subject,
+        );
         wordListsMap[subject] = wordLists
             .map((wl) => wl.listName)
             .toSet()
@@ -88,7 +98,7 @@ class _ProgressScreenState extends State<ProgressScreen>
       }
 
       // Get all attempts
-      final attempts = await WordAttemptService.getAllAttempts();
+      final attempts = await WordAttemptService.getAllAttempts(user.uid);
       final Map<String, List<WordAttempt>> attemptsMap = {};
 
       for (String subject in availableSubjects) {
@@ -358,10 +368,15 @@ class _ProgressScreenState extends State<ProgressScreen>
     List<String> words,
   ) async {
     final Map<String, String> firstDates = {};
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return firstDates;
 
     for (String word in words) {
       // ✅ Get the anchor date from the review plan
-      final plan = await SpacedRepetitionService.getWordReviewPlan(word);
+      final plan = await SpacedRepetitionService.getWordReviewPlan(
+        user.uid,
+        word,
+      );
       if (plan != null) {
         firstDates[word] = plan.anchorDate; // ✅ Use anchor date
       }
@@ -916,10 +931,9 @@ class _ProgressScreenState extends State<ProgressScreen>
     final user = FirebaseAuth.instance.currentUser;
     final userId = user?.uid ?? 'local_student';
 
-    // Check if migration has already been done for this user
-    final prefs = await SharedPreferences.getInstance();
-    final migrationKey = 'schedule_migration_done_$userId';
-    final alreadyMigrated = prefs.getBool(migrationKey) ?? false;
+    // Migration check disabled - SharedPreferences not available
+    // TODO: Implement migration tracking via Firestore or database
+    final alreadyMigrated = false;
 
     if (alreadyMigrated) {
       if (mounted) {
@@ -966,8 +980,9 @@ class _ProgressScreenState extends State<ProgressScreen>
       final dbHelper = DatabaseHelper();
       await dbHelper.clearAllReviewSchedules();
 
-      // Mark migration as done for this user
-      await prefs.setBool(migrationKey, true);
+      // Migration tracking disabled - SharedPreferences not available
+      // TODO: Implement migration tracking via Firestore or database
+      // await prefs.setBool(migrationKey, true);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -997,11 +1012,16 @@ class _ProgressScreenState extends State<ProgressScreen>
 
   Future<void> _showDatabaseDebug() async {
     try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
       // Get all attempts
-      final attempts = await WordAttemptService.getAllAttempts();
+      final attempts = await WordAttemptService.getAllAttempts(user.uid);
 
       // Get review plans
-      final plans = await SpacedRepetitionService.getAllWordReviewPlans();
+      final plans = await SpacedRepetitionService.getAllWordReviewPlans(
+        user.uid,
+      );
 
       // Build debug info
       final buffer = StringBuffer();
@@ -1045,6 +1065,7 @@ class _ProgressScreenState extends State<ProgressScreen>
 
         // Get review dates for this word
         final reviewDates = await SpacedRepetitionService.getWordReviewDates(
+          user.uid,
           plan.word,
         );
         buffer.writeln('  Review Dates (${reviewDates.length} total):');

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../navigation/app_routes.dart';
 import '../models/word_list.dart';
 import '../services/word_list_service.dart';
@@ -24,7 +25,20 @@ class _SubjectWordListsScreenState extends State<SubjectWordListsScreen> {
 
   Future<void> _loadWordLists() async {
     try {
-      final lists = await WordListService.getWordListsBySubject(widget.subject);
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        if (mounted) {
+          setState(() {
+            isLoading = false;
+          });
+        }
+        return;
+      }
+
+      final lists = await WordListService.getWordListsBySubject(
+        user.uid,
+        widget.subject,
+      );
       setState(() {
         wordLists = lists;
         isLoading = false;

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/user_progress.dart';
 import '../models/achievement.dart';
 import '../models/shop_item.dart';
@@ -27,10 +28,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _loadData() async {
     try {
-      final progress = await GamificationService.getUserProgress();
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId == null) {
+        setState(() {
+          _isLoading = false;
+        });
+        return;
+      }
+
+      final progress = await GamificationService.getUserProgress(userId);
       final achievements = await GamificationService.getUnlockedAchievements();
       final ownedItems = await GamificationService.getOwnedItems();
-      
+
       setState(() {
         _userProgress = progress;
         _recentAchievements = achievements.take(3).toList();
@@ -59,7 +68,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: _isLoading
               ? const Center(
                   child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.deepPurple),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Colors.deepPurple,
+                    ),
                   ),
                 )
               : SingleChildScrollView(
@@ -73,9 +84,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           children: [
                             IconButton(
                               onPressed: () => Navigator.pop(context),
-                              icon: const Icon(Icons.arrow_back, color: Colors.deepPurple),
+                              icon: const Icon(
+                                Icons.arrow_back,
+                                color: Colors.deepPurple,
+                              ),
                               style: IconButton.styleFrom(
-                                backgroundColor: Colors.white.withValues(alpha: 0.7),
+                                backgroundColor: Colors.white.withValues(
+                                  alpha: 0.7,
+                                ),
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -158,7 +174,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              
+
               Text(
                 'Learning Champion',
                 style: const TextStyle(
@@ -181,11 +197,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       Colors.amber,
                     ),
                   ),
-                  Container(
-                    width: 1,
-                    height: 50,
-                    color: Colors.white30,
-                  ),
+                  Container(width: 1, height: 50, color: Colors.white30),
                   Expanded(
                     child: _buildStatColumn(
                       'Streak',
@@ -194,11 +206,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       Colors.orange.shade300,
                     ),
                   ),
-                  Container(
-                    width: 1,
-                    height: 50,
-                    color: Colors.white30,
-                  ),
+                  Container(width: 1, height: 50, color: Colors.white30),
                   Expanded(
                     child: _buildStatColumn(
                       'Words',
@@ -216,7 +224,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildStatColumn(String label, String value, IconData icon, Color color) {
+  Widget _buildStatColumn(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
     return Column(
       children: [
         Icon(icon, color: color, size: 28),
@@ -254,7 +267,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Colors.amber,
               () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const AchievementsScreen()),
+                MaterialPageRoute(
+                  builder: (context) => const AchievementsScreen(),
+                ),
               ),
             ),
           ),
@@ -275,7 +290,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildActionCard(String title, IconData icon, Color color, VoidCallback onTap) {
+  Widget _buildActionCard(
+    String title,
+    IconData icon,
+    Color color,
+    VoidCallback onTap,
+  ) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -340,14 +360,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 TextButton(
                   onPressed: () => Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const AchievementsScreen()),
+                    MaterialPageRoute(
+                      builder: (context) => const AchievementsScreen(),
+                    ),
                   ),
                   child: const Text('View All'),
                 ),
             ],
           ),
           const SizedBox(height: 12),
-          
+
           if (_recentAchievements.isEmpty) ...[
             Container(
               padding: const EdgeInsets.all(20),
@@ -357,7 +379,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               child: Row(
                 children: [
-                  Icon(Icons.emoji_events, color: Colors.grey.shade400, size: 40),
+                  Icon(
+                    Icons.emoji_events,
+                    color: Colors.grey.shade400,
+                    size: 40,
+                  ),
                   const SizedBox(width: 16),
                   const Expanded(
                     child: Text(
@@ -373,7 +399,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
           ] else ...[
-            ...(_recentAchievements.map((achievement) => _buildAchievementItem(achievement)).toList()),
+            ...(_recentAchievements
+                .map((achievement) => _buildAchievementItem(achievement))
+                .toList()),
           ],
         ],
       ),
@@ -398,7 +426,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               color: Colors.amber,
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.emoji_events, color: Colors.white, size: 20),
+            child: const Icon(
+              Icons.emoji_events,
+              color: Colors.white,
+              size: 20,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -430,7 +462,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
           if (achievement.rewardAmount > 0)
             Row(
               children: [
-                Icon(Icons.monetization_on, color: Colors.amber.shade700, size: 16),
+                Icon(
+                  Icons.monetization_on,
+                  color: Colors.amber.shade700,
+                  size: 16,
+                ),
                 const SizedBox(width: 2),
                 Text(
                   '+${achievement.rewardAmount}',
@@ -475,7 +511,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          
+
           if (_equippedItems.isEmpty) ...[
             Container(
               padding: const EdgeInsets.all(20),
@@ -504,7 +540,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: _equippedItems.map((item) => _buildEquippedItem(item)).toList(),
+              children: _equippedItems
+                  .map((item) => _buildEquippedItem(item))
+                  .toList(),
             ),
           ],
         ],
@@ -571,7 +609,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          
+
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
@@ -580,11 +618,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             child: Column(
               children: [
-                _buildStatRow('Total Words Completed', '${_userProgress!.totalWordsCompleted}'),
-                _buildStatRow('Correct Answers', '${_userProgress!.totalCorrectAnswers}'),
-                _buildStatRow('Incorrect Answers', '${_userProgress!.totalIncorrectAnswers}'),
-                _buildStatRow('Longest Streak', '${_userProgress!.longestStreak} days'),
-                _buildStatRow('Current Accuracy', '${_userProgress!.accuracy.round()}%'),
+                _buildStatRow(
+                  'Total Words Completed',
+                  '${_userProgress!.totalWordsCompleted}',
+                ),
+                _buildStatRow(
+                  'Correct Answers',
+                  '${_userProgress!.totalCorrectAnswers}',
+                ),
+                _buildStatRow(
+                  'Incorrect Answers',
+                  '${_userProgress!.totalIncorrectAnswers}',
+                ),
+                _buildStatRow(
+                  'Longest Streak',
+                  '${_userProgress!.longestStreak} days',
+                ),
+                _buildStatRow(
+                  'Current Accuracy',
+                  '${_userProgress!.accuracy.round()}%',
+                ),
                 _buildStatRow('Last Practice', _userProgress!.lastPracticeDate),
               ],
             ),

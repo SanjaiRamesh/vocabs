@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../services/spaced_repetition_service.dart';
 import '../services/word_attempt_service.dart';
 import '../services/word_list_service.dart';
@@ -28,8 +29,14 @@ class _TodaysPracticeScreenState extends State<TodaysPracticeScreen> {
 
   Future<void> _loadTodaysWords() async {
     try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
       final today = DateTime.now().toIso8601String().split('T')[0];
-      final schedules = await SpacedRepetitionService.getWordsForReview(today);
+      final schedules = await SpacedRepetitionService.getWordsForReview(
+        user.uid,
+        today,
+      );
 
       setState(() {
         _todaysWords = schedules.map((schedule) => schedule.word).toList();
@@ -45,7 +52,10 @@ class _TodaysPracticeScreenState extends State<TodaysPracticeScreen> {
 
   Future<void> _loadAvailableSubjects() async {
     try {
-      final subjects = await WordListService.getAvailableSubjects();
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      final subjects = await WordListService.getAvailableSubjects(user.uid);
       setState(() {
         _availableSubjects = subjects;
       });
@@ -66,8 +76,10 @@ class _TodaysPracticeScreenState extends State<TodaysPracticeScreen> {
     }
 
     // Create a temporary word list with today's words
+    final user = FirebaseAuth.instance.currentUser;
     final todaysWordList = WordList(
       id: 'todays_practice_${DateTime.now().millisecondsSinceEpoch}',
+      userId: user?.uid ?? '',
       subject: 'Today\'s Review',
       listName: 'Scheduled Words',
       words: _todaysWords,
@@ -189,8 +201,22 @@ class _TodaysPracticeScreenState extends State<TodaysPracticeScreen> {
     navigator.pop(); // Close bottom sheet
 
     try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        scaffoldMessenger.showSnackBar(
+          const SnackBar(
+            content: Text('User not logged in'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
       // Get all word lists for the selected subject
-      final wordLists = await WordListService.getWordListsBySubject(subject);
+      final wordLists = await WordListService.getWordListsBySubject(
+        user.uid,
+        subject,
+      );
 
       if (wordLists.isEmpty) {
         if (mounted) {
@@ -225,6 +251,7 @@ class _TodaysPracticeScreenState extends State<TodaysPracticeScreen> {
       // Create a combined word list for practice
       final practiceWordList = WordList(
         id: '${subject.toLowerCase()}_practice_${DateTime.now().millisecondsSinceEpoch}',
+        userId: user.uid,
         subject: subject,
         listName: '$subject Practice',
         words: allWords,
@@ -588,7 +615,12 @@ class _TodaysPracticeScreenState extends State<TodaysPracticeScreen> {
 
   Future<Map<String, List<WordSchedule>>> _loadCalendarData() async {
     try {
-      final allSchedules = await SpacedRepetitionService.getAllSchedules();
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return {};
+
+      final allSchedules = await SpacedRepetitionService.getAllSchedules(
+        user.uid,
+      );
       final Map<String, List<WordSchedule>> calendarData = {};
 
       for (final schedule in allSchedules) {
@@ -606,16 +638,19 @@ class _TodaysPracticeScreenState extends State<TodaysPracticeScreen> {
     }
   }
 
-  Future<void> _showDateDetails(
+  Future<Map<String, List<WordSchedule>>> _showDateDetails(
     DateTime date,
     List<WordSchedule> schedules,
   ) async {
     // Group schedules by subject
     final Map<String, List<WordSchedule>> subjectSchedules = {};
 
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return subjectSchedules;
+
     for (final schedule in schedules) {
       // Get the subject for this word by finding it in word lists
-      final wordLists = await WordListService.getAllWordLists();
+      final wordLists = await WordListService.getAllWordLists(user.uid);
       String? wordSubject;
 
       for (final wordList in wordLists) {
@@ -642,6 +677,8 @@ class _TodaysPracticeScreenState extends State<TodaysPracticeScreen> {
             _buildDateDetailsBottomSheet(date, subjectSchedules),
       );
     }
+
+    return subjectSchedules;
   }
 
   Widget _buildDateDetailsBottomSheet(
@@ -884,8 +921,10 @@ class _TodaysPracticeScreenState extends State<TodaysPracticeScreen> {
       }
 
       // Create a temporary word list for practice
+      final user = FirebaseAuth.instance.currentUser;
       final practiceWordList = WordList(
         id: '${subject.toLowerCase()}_calendar_practice_${DateTime.now().millisecondsSinceEpoch}',
+        userId: user?.uid ?? '',
         subject: subject,
         listName: '$subject Calendar Review',
         words: words,

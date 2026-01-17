@@ -24,36 +24,47 @@ class SpacedRepetitionService {
   /// Initialize a word's review plan on first attempt
   /// Precomputes all 18 review dates from the anchor date
   static Future<void> initializeWordReviewPlan(
+    String userId,
     String word,
     String anchorDate,
   ) async {
     // Check if plan already exists
-    final existing = await _databaseHelper.getWordReviewPlan(word);
+    final existing = await _databaseHelper.getWordReviewPlan(userId, word);
     if (existing != null) {
       return; // Already initialized
     }
 
     // Create review plan
-    final plan = WordReviewPlan(word: word, anchorDate: anchorDate);
-    await _databaseHelper.insertWordReviewPlan(plan);
+    final plan = WordReviewPlan(
+      userId: userId,
+      word: word,
+      anchorDate: anchorDate,
+    );
+    await _databaseHelper.insertWordReviewPlan(userId, plan);
 
     // Precompute all review dates
     final reviewDates = <WordReviewDate>[];
     for (int i = 0; i < _scheduleOffsets.length; i++) {
       final reviewDate = _addDaysToDate(anchorDate, _scheduleOffsets[i]);
       reviewDates.add(
-        WordReviewDate(word: word, reviewDate: reviewDate, stepIndex: i),
+        WordReviewDate(
+          userId: userId,
+          word: word,
+          reviewDate: reviewDate,
+          stepIndex: i,
+        ),
       );
     }
 
     // Insert all precomputed dates at once
-    await _databaseHelper.insertWordReviewDates(word, reviewDates);
+    await _databaseHelper.insertWordReviewDates(userId, word, reviewDates);
   }
 
   /// Log an attempt for a word on a specific review date
   /// Only the FIRST attempt on a review date is recorded
   /// Subsequent attempts on the same date are ignored
   static Future<void> logWordAttempt(
+    String userId,
     String word,
     String reviewDate,
     String result,
@@ -61,6 +72,7 @@ class SpacedRepetitionService {
   ) async {
     // Check if an attempt already exists for this word on this review date
     final existing = await _databaseHelper.getAttemptForReviewDate(
+      userId,
       word,
       reviewDate,
     );
@@ -72,47 +84,67 @@ class SpacedRepetitionService {
 
     // First attempt on this review date - record it
     final attempt = WordAttemptLog(
+      userId: userId,
       word: word,
       reviewDate: reviewDate,
       result: result,
       heardOrTyped: heardOrTyped,
     );
 
-    await _databaseHelper.insertWordAttemptLog(attempt);
+    await _databaseHelper.insertWordAttemptLog(userId, attempt);
   }
 
   /// Get all words that have a review scheduled for the given date
   /// Includes their attempt result if one exists for that date
-  static Future<List<WordReviewDate>> getWordsForReview(String date) async {
-    return await _databaseHelper.getWordsWithReviewDue(date);
+  static Future<List<WordReviewDate>> getWordsForReview(
+    String userId,
+    String date,
+  ) async {
+    return await _databaseHelper.getWordsWithReviewDue(userId, date);
   }
 
   /// Get the review plan for a word (anchor date)
-  static Future<WordReviewPlan?> getWordReviewPlan(String word) async {
-    return await _databaseHelper.getWordReviewPlan(word);
+  static Future<WordReviewPlan?> getWordReviewPlan(
+    String userId,
+    String word,
+  ) async {
+    return await _databaseHelper.getWordReviewPlan(userId, word);
   }
 
   /// Get all precomputed review dates for a word
-  static Future<List<WordReviewDate>> getWordReviewDates(String word) async {
-    return await _databaseHelper.getWordReviewDates(word);
+  static Future<List<WordReviewDate>> getWordReviewDates(
+    String userId,
+    String word,
+  ) async {
+    return await _databaseHelper.getWordReviewDates(userId, word);
   }
 
   /// Get attempt log for a specific word and review date
   static Future<WordAttemptLog?> getAttemptForReviewDate(
+    String userId,
     String word,
     String reviewDate,
   ) async {
-    return await _databaseHelper.getAttemptForReviewDate(word, reviewDate);
+    return await _databaseHelper.getAttemptForReviewDate(
+      userId,
+      word,
+      reviewDate,
+    );
   }
 
   /// Get all attempt logs for a word
-  static Future<List<WordAttemptLog>> getWordAttemptLogs(String word) async {
-    return await _databaseHelper.getWordAttemptLogs(word);
+  static Future<List<WordAttemptLog>> getWordAttemptLogs(
+    String userId,
+    String word,
+  ) async {
+    return await _databaseHelper.getWordAttemptLogs(userId, word);
   }
 
   /// Get all words with initialized review plans
-  static Future<List<WordReviewPlan>> getAllWordReviewPlans() async {
-    return await _databaseHelper.getAllWordReviewPlans();
+  static Future<List<WordReviewPlan>> getAllWordReviewPlans(
+    String userId,
+  ) async {
+    return await _databaseHelper.getAllWordReviewPlans(userId);
   }
 
   /// Helper: Add days to a date string
@@ -126,16 +158,20 @@ class SpacedRepetitionService {
   // These methods maintain compatibility with code that uses the old WordSchedule API
   /// Calculate which repetition step today corresponds to for a word
   /// Returns the stepIndex (0-17) based on the precomputed review dates
-  static Future<int> getRepetitionStepForDate(String word, String date) async {
+  static Future<int> getRepetitionStepForDate(
+    String userId,
+    String word,
+    String date,
+  ) async {
     // Get the review plan to check if this is the anchor date
-    final plan = await getWordReviewPlan(word);
+    final plan = await getWordReviewPlan(userId, word);
 
     // If this is the anchor date (first practice), return -1
     if (plan != null && plan.anchorDate == date) {
       return -1; // ✅ Not a review, it's initial learning
     }
 
-    final reviewDates = await getWordReviewDates(word);
+    final reviewDates = await getWordReviewDates(userId, word);
 
     // Find exact match in precomputed review dates
     for (final reviewDate in reviewDates) {
@@ -150,12 +186,15 @@ class SpacedRepetitionService {
 
   /// Get word schedule for backward compatibility
   /// Returns a constructed WordSchedule from the review plan
-  static Future<WordSchedule?> getWordSchedule(String word) async {
-    final plan = await getWordReviewPlan(word);
+  static Future<WordSchedule?> getWordSchedule(
+    String userId,
+    String word,
+  ) async {
+    final plan = await getWordReviewPlan(userId, word);
     if (plan == null) return null;
 
     // Get all attempts for this word
-    final attempts = await _databaseHelper.getWordAttemptLogs(word);
+    final attempts = await _databaseHelper.getWordAttemptLogs(userId, word);
 
     // Find the last attempt
     WordAttemptLog? lastAttempt;
@@ -165,6 +204,7 @@ class SpacedRepetitionService {
 
     // Create a synthetic WordSchedule from the plan and attempts
     return WordSchedule(
+      userId: userId,
       word: word,
       repetitionStep: 0,
       lastReviewDate: lastAttempt?.reviewDate ?? plan.anchorDate,
@@ -175,12 +215,12 @@ class SpacedRepetitionService {
   }
 
   /// Get all schedules for backward compatibility
-  static Future<List<WordSchedule>> getAllSchedules() async {
-    final plans = await getAllWordReviewPlans();
+  static Future<List<WordSchedule>> getAllSchedules(String userId) async {
+    final plans = await getAllWordReviewPlans(userId);
     final schedules = <WordSchedule>[];
 
     for (final plan in plans) {
-      final schedule = await getWordSchedule(plan.word);
+      final schedule = await getWordSchedule(userId, plan.word);
       if (schedule != null) {
         schedules.add(schedule);
       }
@@ -190,12 +230,15 @@ class SpacedRepetitionService {
   }
 
   /// Get words for review (returns WordSchedule for compatibility)
-  static Future<List<WordSchedule>> getWordsForReviewCompat(String date) async {
-    final reviewDates = await getWordsForReview(date);
+  static Future<List<WordSchedule>> getWordsForReviewCompat(
+    String userId,
+    String date,
+  ) async {
+    final reviewDates = await getWordsForReview(userId, date);
     final schedules = <WordSchedule>[];
 
     for (final reviewDate in reviewDates) {
-      final schedule = await getWordSchedule(reviewDate.word);
+      final schedule = await getWordSchedule(userId, reviewDate.word);
       if (schedule != null) {
         schedules.add(schedule);
       }
@@ -205,8 +248,8 @@ class SpacedRepetitionService {
   }
 
   /// Get hard words for backward compatibility
-  static Future<List<WordSchedule>> getHardWords() async {
-    final allSchedules = await getAllSchedules();
+  static Future<List<WordSchedule>> getHardWords(String userId) async {
+    final allSchedules = await getAllSchedules(userId);
     return allSchedules.where((s) => s.isHard).toList();
   }
 }

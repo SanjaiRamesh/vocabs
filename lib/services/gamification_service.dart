@@ -9,12 +9,12 @@ class GamificationService {
   static final DatabaseHelper _databaseHelper = DatabaseHelper();
 
   // Initialize gamification system
-  static Future<void> init() async {
+  static Future<void> init(String userId) async {
     if (kIsWeb) return; // Web doesn't support SQLite
     await _createTables();
     await _createDefaultAchievements();
     await _createDefaultShopItems();
-    await _initializeUserProgress();
+    await _initializeUserProgress(userId);
   }
 
   // Create database tables
@@ -369,10 +369,11 @@ class GamificationService {
   }
 
   // Initialize user progress
-  static Future<void> _initializeUserProgress() async {
-    final existingProgress = await getUserProgress();
+  static Future<void> _initializeUserProgress(String userId) async {
+    final existingProgress = await getUserProgress(userId);
     if (existingProgress == null) {
       final progress = UserProgress(
+        userId: userId,
         lastPracticeDate: DateTime.now().toIso8601String().split('T')[0],
       );
       await _saveUserProgress(progress);
@@ -380,12 +381,12 @@ class GamificationService {
   }
 
   // Get user progress
-  static Future<UserProgress?> getUserProgress() async {
+  static Future<UserProgress?> getUserProgress(String userId) async {
     final db = await _databaseHelper.database;
     final result = await db.query(
       'user_progress',
       where: 'user_id = ?',
-      whereArgs: ['default_user'],
+      whereArgs: [userId],
     );
 
     if (result.isNotEmpty) {
@@ -408,10 +409,11 @@ class GamificationService {
 
   // Award coins for correct answer
   static Future<void> awardCoins(
+    String userId,
     int amount, {
     String reason = 'Correct answer',
   }) async {
-    final progress = await getUserProgress();
+    final progress = await getUserProgress(userId);
     if (progress != null) {
       final updatedProgress = progress.copyWith(coins: progress.coins + amount);
       await _saveUserProgress(updatedProgress);
@@ -420,11 +422,12 @@ class GamificationService {
 
   // Update practice stats and check achievements
   static Future<List<Achievement>> updatePracticeStats({
+    required String userId,
     required bool isCorrect,
     required int totalQuestions,
     required int correctAnswers,
   }) async {
-    final progress = await getUserProgress();
+    var progress = await getUserProgress(userId);
     if (progress == null) return [];
 
     final today = DateTime.now().toIso8601String().split('T')[0];
@@ -446,11 +449,15 @@ class GamificationService {
 
     // Award coins for correct answers
     if (isCorrect) {
-      await awardCoins(5, reason: 'Correct answer');
+      await awardCoins(userId, 5, reason: 'Correct answer');
+      await awardCoins(userId, 5, reason: 'Correct answer'); // Saves coins
+      // ✅ FETCH FRESH PROGRESS AFTER COINS ARE AWARDED
+      progress = await getUserProgress(userId) ?? progress;
     }
 
-    // Update progress
+    // Update progress - now includes coins if awarded
     final updatedProgress = progress.copyWith(
+      // ✅ Uses UPDATED progress with coins
       currentStreak: newStreak,
       longestStreak: newStreak > progress.longestStreak
           ? newStreak
@@ -466,16 +473,19 @@ class GamificationService {
 
     // Check for new achievements
     newAchievements.addAll(
-      await _checkWordAchievements(updatedProgress.totalWordsCompleted),
+      await _checkWordAchievements(userId, updatedProgress.totalWordsCompleted),
     );
-    newAchievements.addAll(await _checkStreakAchievements(newStreak));
-    newAchievements.addAll(await _checkPracticeAchievements(updatedProgress));
+    newAchievements.addAll(await _checkStreakAchievements(userId, newStreak));
+    newAchievements.addAll(
+      await _checkPracticeAchievements(userId, updatedProgress),
+    );
 
     return newAchievements;
   }
 
   // Check word-based achievements
   static Future<List<Achievement>> _checkWordAchievements(
+    String userId,
     int totalWords,
   ) async {
     final wordMilestones = [10, 25, 50, 100, 200, 500, 1000];
@@ -483,7 +493,11 @@ class GamificationService {
 
     for (final milestone in wordMilestones) {
       if (totalWords >= milestone) {
-        final achievement = await _unlockAchievement('words', milestone);
+        final achievement = await _unlockAchievement(
+          userId,
+          'words',
+          milestone,
+        );
         if (achievement != null) {
           achievements.add(achievement);
         }
@@ -494,13 +508,20 @@ class GamificationService {
   }
 
   // Check streak-based achievements
-  static Future<List<Achievement>> _checkStreakAchievements(int streak) async {
+  static Future<List<Achievement>> _checkStreakAchievements(
+    String userId,
+    int streak,
+  ) async {
     final streakMilestones = [3, 7, 14, 30, 60, 100];
     final achievements = <Achievement>[];
 
     for (final milestone in streakMilestones) {
       if (streak >= milestone) {
-        final achievement = await _unlockAchievement('streak', milestone);
+        final achievement = await _unlockAchievement(
+          userId,
+          'streak',
+          milestone,
+        );
         if (achievement != null) {
           achievements.add(achievement);
         }
@@ -512,13 +533,14 @@ class GamificationService {
 
   // Check practice-based achievements
   static Future<List<Achievement>> _checkPracticeAchievements(
+    String userId,
     UserProgress progress,
   ) async {
     final achievements = <Achievement>[];
 
     // Check accuracy achievement
     if (progress.accuracy >= 90) {
-      final achievement = await _unlockAchievement('practice', 90);
+      final achievement = await _unlockAchievement(userId, 'practice', 90);
       if (achievement != null) {
         achievements.add(achievement);
       }
@@ -529,6 +551,7 @@ class GamificationService {
 
   // Unlock achievement
   static Future<Achievement?> _unlockAchievement(
+    String userId,
     String category,
     int requirement,
   ) async {
@@ -557,6 +580,7 @@ class GamificationService {
       // Award coins for achievement
       if (achievement.rewardType == 'coins') {
         await awardCoins(
+          userId,
           achievement.rewardAmount,
           reason: 'Achievement: ${achievement.name}',
         );
@@ -617,9 +641,9 @@ class GamificationService {
   }
 
   // Purchase shop item
-  static Future<bool> purchaseItem(String itemId) async {
+  static Future<bool> purchaseItem(String userId, String itemId) async {
     final db = await _databaseHelper.database;
-    final progress = await getUserProgress();
+    final progress = await getUserProgress(userId);
     if (progress == null) return false;
 
     // Get item details
@@ -650,20 +674,20 @@ class GamificationService {
     );
 
     // Check shop achievements
-    await _checkShopAchievements();
+    await _checkShopAchievements(userId);
 
     return true;
   }
 
   // Check shop-based achievements
-  static Future<void> _checkShopAchievements() async {
+  static Future<void> _checkShopAchievements(String userId) async {
     final ownedItems = await getOwnedItems();
 
     if (ownedItems.isNotEmpty) {
-      await _unlockAchievement('shop', 1);
+      await _unlockAchievement(userId, 'shop', 1);
     }
     if (ownedItems.length >= 5) {
-      await _unlockAchievement('shop', 5);
+      await _unlockAchievement(userId, 'shop', 5);
     }
   }
 

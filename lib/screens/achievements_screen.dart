@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/achievement.dart';
 import '../models/user_progress.dart';
 import '../services/gamification_service.dart';
@@ -10,7 +11,8 @@ class AchievementsScreen extends StatefulWidget {
   State<AchievementsScreen> createState() => _AchievementsScreenState();
 }
 
-class _AchievementsScreenState extends State<AchievementsScreen> with TickerProviderStateMixin {
+class _AchievementsScreenState extends State<AchievementsScreen>
+    with TickerProviderStateMixin {
   List<Achievement> _achievements = [];
   UserProgress? _userProgress;
   bool _isLoading = true;
@@ -31,9 +33,17 @@ class _AchievementsScreenState extends State<AchievementsScreen> with TickerProv
 
   Future<void> _loadData() async {
     try {
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId == null) {
+        setState(() {
+          _isLoading = false;
+        });
+        return;
+      }
+
       final achievements = await GamificationService.getAllAchievements();
-      final progress = await GamificationService.getUserProgress();
-      
+      final progress = await GamificationService.getUserProgress(userId);
+
       setState(() {
         _achievements = achievements;
         _userProgress = progress;
@@ -47,7 +57,9 @@ class _AchievementsScreenState extends State<AchievementsScreen> with TickerProv
   }
 
   List<Achievement> _getAchievementsByCategory(String category) {
-    return _achievements.where((achievement) => achievement.category == category).toList();
+    return _achievements
+        .where((achievement) => achievement.category == category)
+        .toList();
   }
 
   @override
@@ -71,7 +83,10 @@ class _AchievementsScreenState extends State<AchievementsScreen> with TickerProv
                   children: [
                     IconButton(
                       onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.arrow_back, color: Colors.deepPurple),
+                      icon: const Icon(
+                        Icons.arrow_back,
+                        color: Colors.deepPurple,
+                      ),
                       style: IconButton.styleFrom(
                         backgroundColor: Colors.white.withValues(alpha: 0.7),
                       ),
@@ -104,7 +119,10 @@ class _AchievementsScreenState extends State<AchievementsScreen> with TickerProv
                     ),
                     // Coins display
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.amber.shade100,
                         borderRadius: BorderRadius.circular(25),
@@ -113,7 +131,11 @@ class _AchievementsScreenState extends State<AchievementsScreen> with TickerProv
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.monetization_on, color: Colors.amber.shade700, size: 20),
+                          Icon(
+                            Icons.monetization_on,
+                            color: Colors.amber.shade700,
+                            size: 20,
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             '${_userProgress?.coins ?? 0}',
@@ -137,11 +159,32 @@ class _AchievementsScreenState extends State<AchievementsScreen> with TickerProv
                   margin: const EdgeInsets.symmetric(horizontal: 20),
                   child: Row(
                     children: [
-                      Expanded(child: _buildStatCard('Streak', '${_userProgress!.currentStreak}', Icons.local_fire_department, Colors.orange)),
+                      Expanded(
+                        child: _buildStatCard(
+                          'Streak',
+                          '${_userProgress!.currentStreak}',
+                          Icons.local_fire_department,
+                          Colors.orange,
+                        ),
+                      ),
                       const SizedBox(width: 12),
-                      Expanded(child: _buildStatCard('Words', '${_userProgress!.totalWordsCompleted}', Icons.library_books, Colors.blue)),
+                      Expanded(
+                        child: _buildStatCard(
+                          'Words',
+                          '${_userProgress!.totalWordsCompleted}',
+                          Icons.library_books,
+                          Colors.blue,
+                        ),
+                      ),
                       const SizedBox(width: 12),
-                      Expanded(child: _buildStatCard('Accuracy', '${_userProgress!.accuracy.round()}%', Icons.gps_fixed, Colors.green)),
+                      Expanded(
+                        child: _buildStatCard(
+                          'Accuracy',
+                          '${_userProgress!.accuracy.round()}%',
+                          Icons.gps_fixed,
+                          Colors.green,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -160,12 +203,21 @@ class _AchievementsScreenState extends State<AchievementsScreen> with TickerProv
                   isScrollable: true,
                   labelColor: Colors.deepPurple,
                   unselectedLabelColor: Colors.grey,
-                  labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                  labelStyle: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
                   indicatorColor: Colors.deepPurple,
                   tabs: const [
                     Tab(text: 'All', icon: Icon(Icons.emoji_events, size: 20)),
-                    Tab(text: 'Words', icon: Icon(Icons.library_books, size: 20)),
-                    Tab(text: 'Streaks', icon: Icon(Icons.local_fire_department, size: 20)),
+                    Tab(
+                      text: 'Words',
+                      icon: Icon(Icons.library_books, size: 20),
+                    ),
+                    Tab(
+                      text: 'Streaks',
+                      icon: Icon(Icons.local_fire_department, size: 20),
+                    ),
                     Tab(text: 'Practice', icon: Icon(Icons.school, size: 20)),
                     Tab(text: 'Shop', icon: Icon(Icons.shopping_bag, size: 20)),
                   ],
@@ -178,17 +230,27 @@ class _AchievementsScreenState extends State<AchievementsScreen> with TickerProv
                 child: _isLoading
                     ? const Center(
                         child: CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.deepPurple),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.deepPurple,
+                          ),
                         ),
                       )
                     : TabBarView(
                         controller: _tabController,
                         children: [
                           _buildAchievementsList(_achievements),
-                          _buildAchievementsList(_getAchievementsByCategory('words')),
-                          _buildAchievementsList(_getAchievementsByCategory('streak')),
-                          _buildAchievementsList(_getAchievementsByCategory('practice')),
-                          _buildAchievementsList(_getAchievementsByCategory('shop')),
+                          _buildAchievementsList(
+                            _getAchievementsByCategory('words'),
+                          ),
+                          _buildAchievementsList(
+                            _getAchievementsByCategory('streak'),
+                          ),
+                          _buildAchievementsList(
+                            _getAchievementsByCategory('practice'),
+                          ),
+                          _buildAchievementsList(
+                            _getAchievementsByCategory('shop'),
+                          ),
                         ],
                       ),
               ),
@@ -199,7 +261,12 @@ class _AchievementsScreenState extends State<AchievementsScreen> with TickerProv
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+  Widget _buildStatCard(
+    String title,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -245,11 +312,7 @@ class _AchievementsScreenState extends State<AchievementsScreen> with TickerProv
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.emoji_events,
-              size: 64,
-              color: Colors.grey.shade300,
-            ),
+            Icon(Icons.emoji_events, size: 64, color: Colors.grey.shade300),
             const SizedBox(height: 16),
             Text(
               'No achievements in this category yet!',
@@ -277,21 +340,21 @@ class _AchievementsScreenState extends State<AchievementsScreen> with TickerProv
 
   Widget _buildAchievementCard(Achievement achievement) {
     final isUnlocked = achievement.isUnlocked;
-    
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       child: Card(
         elevation: isUnlocked ? 8 : 4,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(15),
-          side: isUnlocked 
+          side: isUnlocked
               ? BorderSide(color: Colors.amber, width: 2)
               : BorderSide.none,
         ),
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(15),
-            gradient: isUnlocked 
+            gradient: isUnlocked
                 ? LinearGradient(
                     colors: [Colors.amber.shade50, Colors.yellow.shade50],
                     begin: Alignment.topLeft,
@@ -308,17 +371,17 @@ class _AchievementsScreenState extends State<AchievementsScreen> with TickerProv
                   width: 60,
                   height: 60,
                   decoration: BoxDecoration(
-                    color: isUnlocked 
-                        ? Colors.amber 
-                        : Colors.grey.shade300,
+                    color: isUnlocked ? Colors.amber : Colors.grey.shade300,
                     shape: BoxShape.circle,
-                    boxShadow: isUnlocked ? [
-                      BoxShadow(
-                        color: Colors.amber.withValues(alpha: 0.3),
-                        blurRadius: 10,
-                        spreadRadius: 2,
-                      ),
-                    ] : null,
+                    boxShadow: isUnlocked
+                        ? [
+                            BoxShadow(
+                              color: Colors.amber.withValues(alpha: 0.3),
+                              blurRadius: 10,
+                              spreadRadius: 2,
+                            ),
+                          ]
+                        : null,
                   ),
                   child: Icon(
                     _getAchievementIcon(achievement.iconName),
@@ -327,7 +390,7 @@ class _AchievementsScreenState extends State<AchievementsScreen> with TickerProv
                   ),
                 ),
                 const SizedBox(width: 16),
-                
+
                 // Achievement Details
                 Expanded(
                   child: Column(
@@ -341,13 +404,19 @@ class _AchievementsScreenState extends State<AchievementsScreen> with TickerProv
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
-                                color: isUnlocked ? Colors.deepPurple : Colors.grey.shade700,
+                                color: isUnlocked
+                                    ? Colors.deepPurple
+                                    : Colors.grey.shade700,
                                 fontFamily: 'OpenDyslexic',
                               ),
                             ),
                           ),
                           if (isUnlocked) ...[
-                            Icon(Icons.check_circle, color: Colors.green, size: 20),
+                            Icon(
+                              Icons.check_circle,
+                              color: Colors.green,
+                              size: 20,
+                            ),
                           ],
                         ],
                       ),
@@ -356,12 +425,14 @@ class _AchievementsScreenState extends State<AchievementsScreen> with TickerProv
                         achievement.description,
                         style: TextStyle(
                           fontSize: 14,
-                          color: isUnlocked ? Colors.grey.shade700 : Colors.grey.shade500,
+                          color: isUnlocked
+                              ? Colors.grey.shade700
+                              : Colors.grey.shade500,
                           fontFamily: 'OpenDyslexic',
                         ),
                       ),
                       const SizedBox(height: 8),
-                      
+
                       // Progress or Reward
                       Row(
                         children: [
@@ -372,7 +443,10 @@ class _AchievementsScreenState extends State<AchievementsScreen> with TickerProv
                             ),
                           ] else if (isUnlocked) ...[
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
                               decoration: BoxDecoration(
                                 color: Colors.green.shade100,
                                 borderRadius: BorderRadius.circular(8),
@@ -387,12 +461,15 @@ class _AchievementsScreenState extends State<AchievementsScreen> with TickerProv
                               ),
                             ),
                           ],
-                          
+
                           // Reward display
                           if (achievement.rewardAmount > 0) ...[
                             const SizedBox(width: 8),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
                               decoration: BoxDecoration(
                                 color: Colors.amber.shade100,
                                 borderRadius: BorderRadius.circular(8),
@@ -400,7 +477,11 @@ class _AchievementsScreenState extends State<AchievementsScreen> with TickerProv
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.monetization_on, size: 14, color: Colors.amber.shade700),
+                                  Icon(
+                                    Icons.monetization_on,
+                                    size: 14,
+                                    color: Colors.amber.shade700,
+                                  ),
                                   const SizedBox(width: 2),
                                   Text(
                                     '${achievement.rewardAmount}',
@@ -429,10 +510,10 @@ class _AchievementsScreenState extends State<AchievementsScreen> with TickerProv
 
   Widget _buildProgressIndicator(Achievement achievement) {
     if (_userProgress == null) return const SizedBox.shrink();
-    
+
     double progress = 0.0;
     int current = 0;
-    
+
     switch (achievement.category) {
       case 'words':
         current = _userProgress!.totalWordsCompleted;
@@ -443,7 +524,8 @@ class _AchievementsScreenState extends State<AchievementsScreen> with TickerProv
         progress = (current / achievement.requirement).clamp(0.0, 1.0);
         break;
       case 'practice':
-        if (achievement.requirement == 90) { // Accuracy achievement
+        if (achievement.requirement == 90) {
+          // Accuracy achievement
           current = _userProgress!.accuracy.round();
           progress = (current / achievement.requirement).clamp(0.0, 1.0);
         }
@@ -455,7 +537,7 @@ class _AchievementsScreenState extends State<AchievementsScreen> with TickerProv
         progress = 0.0;
         break;
     }
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -523,7 +605,7 @@ class _AchievementsScreenState extends State<AchievementsScreen> with TickerProv
   String _formatDate(DateTime date) {
     final now = DateTime.now();
     final difference = now.difference(date);
-    
+
     if (difference.inDays == 0) {
       return 'today';
     } else if (difference.inDays == 1) {

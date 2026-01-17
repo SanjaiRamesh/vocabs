@@ -13,8 +13,8 @@ void main() async {
   await WordAttemptService.init();
   await SpacedRepetitionService.init();
 
-  // Create default word lists if none exist
-  await WordListService.createDefaultWordLists();
+  // Note: Default word lists are created per user after login in dev_login_screen
+  // Do not create default lists here as we don't have a user context yet
 
   runApp(const MyApp());
 }

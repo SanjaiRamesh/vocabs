@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'dart:io';
@@ -48,7 +49,15 @@ class _WordListEditorScreenState extends State<WordListEditorScreen> {
       });
 
       try {
-        final wordList = await WordListService.getWordListById(widget.listId!);
+        final user = FirebaseAuth.instance.currentUser;
+        if (user == null) {
+          throw Exception('User not logged in');
+        }
+
+        final wordList = await WordListService.getWordListById(
+          user.uid,
+          widget.listId!,
+        );
         if (wordList != null) {
           setState(() {
             existingWordList = wordList;
@@ -333,8 +342,14 @@ class _WordListEditorScreenState extends State<WordListEditorScreen> {
       });
 
       try {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user == null) {
+          throw Exception('User not logged in');
+        }
+
         final wordList = WordList(
           id: widget.listId ?? 'list_${DateTime.now().millisecondsSinceEpoch}',
+          userId: user.uid,
           subject: _subjectController.text.trim(),
           listName: _listNameController.text.trim(),
           words: words,
@@ -412,7 +427,12 @@ class _WordListEditorScreenState extends State<WordListEditorScreen> {
       });
 
       try {
-        await WordListService.deleteWordList(widget.listId!);
+        final user = FirebaseAuth.instance.currentUser;
+        if (user == null) {
+          throw Exception('User not logged in');
+        }
+
+        await WordListService.deleteWordList(user.uid, widget.listId!);
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

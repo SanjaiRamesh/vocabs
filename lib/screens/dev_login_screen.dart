@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
+import '../services/word_list_service.dart';
+import '../services/gamification_service.dart';
 import 'admin_screen.dart';
 import 'main_screen.dart';
 
@@ -13,6 +15,7 @@ class DevLoginScreen extends StatefulWidget {
 }
 
 class _DevLoginScreenState extends State<DevLoginScreen> {
+  static const String _domainSuffix = '@test.app';
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _auth = FirebaseAuth.instance;
@@ -28,8 +31,10 @@ class _DevLoginScreenState extends State<DevLoginScreen> {
 
   Future<void> _login() async {
     debugPrint('DEBUG: Login button pressed');
-
-    final email = _emailController.text.trim();
+    final usernameOrEmail = _emailController.text.trim();
+    final email = usernameOrEmail.contains('@')
+        ? usernameOrEmail
+        : '$usernameOrEmail$_domainSuffix';
     final password = _passwordController.text.trim();
 
     debugPrint('DEBUG: Email = $email');
@@ -86,6 +91,26 @@ class _DevLoginScreenState extends State<DevLoginScreen> {
         throw Exception('User role not found');
       }
 
+      // Create default word lists if none exist for this user
+      if (!kIsWeb) {
+        try {
+          await WordListService.createDefaultWordLists(uid);
+          debugPrint(
+            'DEBUG: Default word lists created/verified for user $uid',
+          );
+        } catch (e) {
+          debugPrint('Warning: Failed to create default word lists: $e');
+        }
+
+        // Initialize gamification system for this user
+        try {
+          await GamificationService.init(uid);
+          debugPrint('DEBUG: Gamification system initialized for user $uid');
+        } catch (e) {
+          debugPrint('Warning: Failed to initialize gamification system: $e');
+        }
+      }
+
       if (!mounted) return;
 
       // Navigate based on role
@@ -133,45 +158,170 @@ class _DevLoginScreenState extends State<DevLoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Dev Login')),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TextField(
-                controller: _emailController,
-                decoration: const InputDecoration(
-                  labelText: 'Email',
-                  border: OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.emailAddress,
-                enabled: !_isLoading,
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _passwordController,
-                decoration: const InputDecoration(
-                  labelText: 'Password',
-                  border: OutlineInputBorder(),
-                ),
-                obscureText: true,
-                enabled: !_isLoading,
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: _isLoading ? null : _login,
-                child: _isLoading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Login'),
-              ),
+      backgroundColor: Colors.transparent,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFFE1F5FE), // Light blue
+              Color(0xFFF3E5F5), // Light purple
+              Color(0xFFE8F5E8), // Light green
             ],
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24.0),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Card(
+                  elevation: 12,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 28,
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Friendly header
+                        Wrap(
+                          alignment: WrapAlignment.center,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 12,
+                          runSpacing: 6,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.deepPurple.withOpacity(0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.face_retouching_natural,
+                                color: Colors.deepPurple,
+                                size: 36,
+                              ),
+                            ),
+                            const Text(
+                              'welcome to RA, Please login',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.deepPurple,
+                                fontFamily: 'OpenDyslexic',
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Enter your username; the domain is added automatically',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.black54,
+                            fontFamily: 'OpenDyslexic',
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+
+                        // Email field
+                        TextField(
+                          controller: _emailController,
+                          decoration: InputDecoration(
+                            labelText: 'Username',
+                            prefixIcon: const Icon(Icons.person_outline),
+                            suffixText: _domainSuffix,
+                            filled: true,
+                            fillColor: Colors.grey.shade100,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          keyboardType: TextInputType.text,
+                          enabled: !_isLoading,
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Password field
+                        TextField(
+                          controller: _passwordController,
+                          decoration: InputDecoration(
+                            labelText: 'Password',
+                            prefixIcon: const Icon(Icons.lock_outline),
+                            filled: true,
+                            fillColor: Colors.grey.shade100,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          obscureText: true,
+                          enabled: !_isLoading,
+                        ),
+
+                        const SizedBox(height: 20),
+
+                        // Login button
+                        SizedBox(
+                          height: 48,
+                          child: ElevatedButton(
+                            onPressed: _isLoading ? null : _login,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.deepPurple,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            child: _isLoading
+                                ? const SizedBox(
+                                    height: 22,
+                                    width: 22,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
+                                    ),
+                                  )
+                                : const Text(
+                                    'Sign In',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      fontFamily: 'OpenDyslexic',
+                                    ),
+                                  ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        // Helper text
+                        const Text(
+                          'Use your school email and password',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.black45,
+                            fontFamily: 'OpenDyslexic',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
       ),

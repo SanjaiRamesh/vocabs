@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../services/word_list_service.dart';
 import 'network_test_screen.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'dev_login_screen.dart';
 
 class AdminScreen extends StatefulWidget {
@@ -45,7 +45,15 @@ class _AdminScreenState extends State<AdminScreen> {
     });
 
     try {
-      final wordLists = await WordListService.getAllWordLists();
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        setState(() {
+          _isLoading = false;
+        });
+        return;
+      }
+
+      final wordLists = await WordListService.getAllWordLists(user.uid);
       final subjects = wordLists.map((list) => list.subject).toSet().toList();
       subjects.sort();
 
@@ -113,7 +121,12 @@ class _AdminScreenState extends State<AdminScreen> {
     bool showSnackbar = true,
   }) async {
     try {
-      await WordListService.renameSubject(oldName, newName);
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw Exception('User not logged in');
+      }
+
+      await WordListService.renameSubject(user.uid, oldName, newName);
       await _loadSubjects();
       if (showSnackbar && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -134,7 +147,12 @@ class _AdminScreenState extends State<AdminScreen> {
     bool showSnackbar = true,
   }) async {
     try {
-      await WordListService.deleteSubject(subject);
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw Exception('User not logged in');
+      }
+
+      await WordListService.deleteSubject(user.uid, subject);
       await _loadSubjects();
       if (showSnackbar && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

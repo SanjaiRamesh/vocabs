@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/shop_item.dart';
 import '../models/user_progress.dart';
 import '../services/gamification_service.dart';
@@ -31,9 +32,17 @@ class _ShopScreenState extends State<ShopScreen> with TickerProviderStateMixin {
 
   Future<void> _loadData() async {
     try {
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId == null) {
+        setState(() {
+          _isLoading = false;
+        });
+        return;
+      }
+
       final shopItems = await GamificationService.getAllShopItems();
-      final progress = await GamificationService.getUserProgress();
-      
+      final progress = await GamificationService.getUserProgress(userId);
+
       setState(() {
         _shopItems = shopItems;
         _userProgress = progress;
@@ -52,21 +61,26 @@ class _ShopScreenState extends State<ShopScreen> with TickerProviderStateMixin {
   }
 
   Future<void> _purchaseItem(ShopItem item) async {
-    if (_userProgress == null || _userProgress!.coins < item.price || item.isOwned) {
+    if (_userProgress == null ||
+        _userProgress!.coins < item.price ||
+        item.isOwned) {
       return;
     }
+
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
 
     // Show confirmation dialog
     final confirmed = await _showPurchaseDialog(item);
     if (!confirmed) return;
 
     try {
-      final success = await GamificationService.purchaseItem(item.id);
-      
+      final success = await GamificationService.purchaseItem(userId, item.id);
+
       if (success) {
         // Refresh data
         await _loadData();
-        
+
         // Show success message
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -103,149 +117,173 @@ class _ShopScreenState extends State<ShopScreen> with TickerProviderStateMixin {
 
   Future<bool> _showPurchaseDialog(ShopItem item) async {
     return await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        title: Text(
-          'Purchase ${item.name}?',
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontFamily: 'OpenDyslexic',
-          ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Item preview
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: item.rarityColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: item.rarityColor, width: 2),
-              ),
-              child: Column(
-                children: [
-                  Icon(
-                    _getCategoryIcon(item.category),
-                    size: 48,
-                    color: item.rarityColor,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    item.name,
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: item.rarityColor,
-                      fontFamily: 'OpenDyslexic',
-                    ),
-                  ),
-                  Text(
-                    item.rarity.toUpperCase(),
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: item.rarityColor,
-                    ),
-                  ),
-                ],
+          context: context,
+          builder: (context) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+            ),
+            title: Text(
+              'Purchase ${item.name}?',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontFamily: 'OpenDyslexic',
               ),
             ),
-            const SizedBox(height: 16),
-            
-            // Cost and balance
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Cost:',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                ),
-                Row(
-                  children: [
-                    Icon(Icons.monetization_on, color: Colors.amber.shade700, size: 20),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${item.price}',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.amber.shade800,
+                // Item preview
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: item.rarityColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: item.rarityColor, width: 2),
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(
+                        _getCategoryIcon(item.category),
+                        size: 48,
+                        color: item.rarityColor,
                       ),
+                      const SizedBox(height: 8),
+                      Text(
+                        item.name,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: item.rarityColor,
+                          fontFamily: 'OpenDyslexic',
+                        ),
+                      ),
+                      Text(
+                        item.rarity.toUpperCase(),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: item.rarityColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Cost and balance
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Cost:',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.monetization_on,
+                          color: Colors.amber.shade700,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${item.price}',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.amber.shade800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Your coins:',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.monetization_on,
+                          color: Colors.amber.shade700,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${_userProgress?.coins ?? 0}',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.amber.shade800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'After purchase:',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.monetization_on,
+                          color: Colors.amber.shade700,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${(_userProgress?.coins ?? 0) - item.price}',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.amber.shade800,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Your coins:',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
                 ),
-                Row(
-                  children: [
-                    Icon(Icons.monetization_on, color: Colors.amber.shade700, size: 20),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${_userProgress?.coins ?? 0}',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.amber.shade800,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'After purchase:',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                ),
-                Row(
-                  children: [
-                    Icon(Icons.monetization_on, color: Colors.amber.shade700, size: 20),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${(_userProgress?.coins ?? 0) - item.price}',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.amber.shade800,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+                child: const Text('Purchase'),
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Purchase'),
-          ),
-        ],
-      ),
-    ) ?? false;
+        ) ??
+        false;
   }
 
   @override
@@ -269,7 +307,10 @@ class _ShopScreenState extends State<ShopScreen> with TickerProviderStateMixin {
                   children: [
                     IconButton(
                       onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.arrow_back, color: Colors.deepPurple),
+                      icon: const Icon(
+                        Icons.arrow_back,
+                        color: Colors.deepPurple,
+                      ),
                       style: IconButton.styleFrom(
                         backgroundColor: Colors.white.withValues(alpha: 0.7),
                       ),
@@ -288,7 +329,10 @@ class _ShopScreenState extends State<ShopScreen> with TickerProviderStateMixin {
                     ),
                     // Coins display
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.amber.shade100,
                         borderRadius: BorderRadius.circular(25),
@@ -297,7 +341,11 @@ class _ShopScreenState extends State<ShopScreen> with TickerProviderStateMixin {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.monetization_on, color: Colors.amber.shade700, size: 20),
+                          Icon(
+                            Icons.monetization_on,
+                            color: Colors.amber.shade700,
+                            size: 20,
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             '${_userProgress?.coins ?? 0}',
@@ -326,12 +374,18 @@ class _ShopScreenState extends State<ShopScreen> with TickerProviderStateMixin {
                   controller: _tabController,
                   labelColor: Colors.deepPurple,
                   unselectedLabelColor: Colors.grey,
-                  labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  labelStyle: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
                   indicatorColor: Colors.deepPurple,
                   tabs: const [
                     Tab(text: 'All', icon: Icon(Icons.store, size: 20)),
                     Tab(text: 'Pets', icon: Icon(Icons.pets, size: 20)),
-                    Tab(text: 'Plants', icon: Icon(Icons.local_florist, size: 20)),
+                    Tab(
+                      text: 'Plants',
+                      icon: Icon(Icons.local_florist, size: 20),
+                    ),
                     Tab(text: 'Aquarium', icon: Icon(Icons.waves, size: 20)),
                   ],
                 ),
@@ -343,7 +397,9 @@ class _ShopScreenState extends State<ShopScreen> with TickerProviderStateMixin {
                 child: _isLoading
                     ? const Center(
                         child: CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.deepPurple),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.deepPurple,
+                          ),
                         ),
                       )
                     : TabBarView(
@@ -408,7 +464,7 @@ class _ShopScreenState extends State<ShopScreen> with TickerProviderStateMixin {
   Widget _buildShopItemCard(ShopItem item) {
     final canAfford = (_userProgress?.coins ?? 0) >= item.price;
     final isOwned = item.isOwned;
-    
+
     return GestureDetector(
       onTap: () {
         if (!isOwned && canAfford) {
@@ -433,7 +489,7 @@ class _ShopScreenState extends State<ShopScreen> with TickerProviderStateMixin {
           ),
           boxShadow: [
             BoxShadow(
-              color: isOwned 
+              color: isOwned
                   ? Colors.green.withValues(alpha: 0.3)
                   : item.rarityColor.withValues(alpha: 0.3),
               blurRadius: 8,
@@ -454,7 +510,7 @@ class _ShopScreenState extends State<ShopScreen> with TickerProviderStateMixin {
                     width: 60,
                     height: 60,
                     decoration: BoxDecoration(
-                      color: isOwned 
+                      color: isOwned
                           ? Colors.green.withValues(alpha: 0.1)
                           : item.rarityColor.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
@@ -470,7 +526,7 @@ class _ShopScreenState extends State<ShopScreen> with TickerProviderStateMixin {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  
+
                   // Item name
                   Text(
                     item.name,
@@ -485,10 +541,13 @@ class _ShopScreenState extends State<ShopScreen> with TickerProviderStateMixin {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
-                  
+
                   // Rarity
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: item.rarityColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
@@ -503,11 +562,14 @@ class _ShopScreenState extends State<ShopScreen> with TickerProviderStateMixin {
                     ),
                   ),
                   const Spacer(),
-                  
+
                   // Price or status
                   if (isOwned) ...[
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.green,
                         borderRadius: BorderRadius.circular(20),
@@ -515,7 +577,11 @@ class _ShopScreenState extends State<ShopScreen> with TickerProviderStateMixin {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.check, color: Colors.white, size: 16),
+                          const Icon(
+                            Icons.check,
+                            color: Colors.white,
+                            size: 16,
+                          ),
                           const SizedBox(width: 4),
                           const Text(
                             'OWNED',
@@ -530,9 +596,14 @@ class _ShopScreenState extends State<ShopScreen> with TickerProviderStateMixin {
                     ),
                   ] else ...[
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
-                        color: canAfford ? Colors.amber.shade100 : Colors.grey.shade200,
+                        color: canAfford
+                            ? Colors.amber.shade100
+                            : Colors.grey.shade200,
                         borderRadius: BorderRadius.circular(15),
                         border: Border.all(
                           color: canAfford ? Colors.amber : Colors.grey,
@@ -545,7 +616,9 @@ class _ShopScreenState extends State<ShopScreen> with TickerProviderStateMixin {
                           Icon(
                             Icons.monetization_on,
                             size: 16,
-                            color: canAfford ? Colors.amber.shade700 : Colors.grey,
+                            color: canAfford
+                                ? Colors.amber.shade700
+                                : Colors.grey,
                           ),
                           const SizedBox(width: 4),
                           Text(
@@ -553,7 +626,9 @@ class _ShopScreenState extends State<ShopScreen> with TickerProviderStateMixin {
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
-                              color: canAfford ? Colors.amber.shade800 : Colors.grey,
+                              color: canAfford
+                                  ? Colors.amber.shade800
+                                  : Colors.grey,
                             ),
                           ),
                         ],
@@ -563,7 +638,7 @@ class _ShopScreenState extends State<ShopScreen> with TickerProviderStateMixin {
                 ],
               ),
             ),
-            
+
             // Equipped indicator
             if (isOwned && item.isEquipped) ...[
               Positioned(
@@ -582,11 +657,7 @@ class _ShopScreenState extends State<ShopScreen> with TickerProviderStateMixin {
                       ),
                     ],
                   ),
-                  child: const Icon(
-                    Icons.star,
-                    size: 16,
-                    color: Colors.white,
-                  ),
+                  child: const Icon(Icons.star, size: 16, color: Colors.white),
                 ),
               ),
             ],

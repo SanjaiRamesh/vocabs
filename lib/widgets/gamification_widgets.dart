@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/user_progress.dart';
 import '../services/gamification_service.dart';
 
@@ -21,7 +22,17 @@ class _GamificationHeaderState extends State<GamificationHeader> {
 
   Future<void> _loadUserProgress() async {
     try {
-      final progress = await GamificationService.getUserProgress();
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId == null) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+        return;
+      }
+
+      final progress = await GamificationService.getUserProgress(userId);
       if (mounted) {
         setState(() {
           _userProgress = progress;
@@ -72,13 +83,9 @@ class _GamificationHeaderState extends State<GamificationHeader> {
               color: Colors.amber,
             ),
           ),
-          
-          Container(
-            width: 1,
-            height: 40,
-            color: Colors.grey.shade300,
-          ),
-          
+
+          Container(width: 1, height: 40, color: Colors.grey.shade300),
+
           // Current Streak
           Expanded(
             child: _buildStatItem(
@@ -88,13 +95,9 @@ class _GamificationHeaderState extends State<GamificationHeader> {
               color: Colors.orange,
             ),
           ),
-          
-          Container(
-            width: 1,
-            height: 40,
-            color: Colors.grey.shade300,
-          ),
-          
+
+          Container(width: 1, height: 40, color: Colors.grey.shade300),
+
           // Accuracy
           Expanded(
             child: _buildStatItem(
@@ -158,7 +161,7 @@ class RewardNotification extends StatefulWidget {
   State<RewardNotification> createState() => _RewardNotificationState();
 }
 
-class _RewardNotificationState extends State<RewardNotification> 
+class _RewardNotificationState extends State<RewardNotification>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
@@ -172,21 +175,16 @@ class _RewardNotificationState extends State<RewardNotification>
       vsync: this,
     );
 
-    _scaleAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.bounceOut,
-    ));
+    _scaleAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.bounceOut),
+    );
 
-    _opacityAnimation = Tween<double>(
-      begin: 1.0,
-      end: 0.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: const Interval(0.7, 1.0, curve: Curves.easeOut),
-    ));
+    _opacityAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: const Interval(0.7, 1.0, curve: Curves.easeOut),
+      ),
+    );
 
     _animationController.forward().then((_) {
       if (widget.onComplete != null) {
@@ -282,7 +280,8 @@ class AchievementNotification extends StatefulWidget {
   });
 
   @override
-  State<AchievementNotification> createState() => _AchievementNotificationState();
+  State<AchievementNotification> createState() =>
+      _AchievementNotificationState();
 }
 
 class _AchievementNotificationState extends State<AchievementNotification>
@@ -299,21 +298,19 @@ class _AchievementNotificationState extends State<AchievementNotification>
       vsync: this,
     );
 
-    _slideAnimation = Tween<double>(
-      begin: -1.0,
-      end: 0.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: const Interval(0.0, 0.3, curve: Curves.elasticOut),
-    ));
+    _slideAnimation = Tween<double>(begin: -1.0, end: 0.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: const Interval(0.0, 0.3, curve: Curves.elasticOut),
+      ),
+    );
 
-    _opacityAnimation = Tween<double>(
-      begin: 1.0,
-      end: 0.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: const Interval(0.8, 1.0, curve: Curves.easeOut),
-    ));
+    _opacityAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: const Interval(0.8, 1.0, curve: Curves.easeOut),
+      ),
+    );
 
     _animationController.forward().then((_) {
       if (widget.onComplete != null) {
@@ -334,7 +331,10 @@ class _AchievementNotificationState extends State<AchievementNotification>
       animation: _animationController,
       builder: (context, child) {
         return Transform.translate(
-          offset: Offset(_slideAnimation.value * MediaQuery.of(context).size.width, 0),
+          offset: Offset(
+            _slideAnimation.value * MediaQuery.of(context).size.width,
+            0,
+          ),
           child: Opacity(
             opacity: _opacityAnimation.value,
             child: Container(

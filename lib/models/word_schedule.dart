@@ -1,4 +1,5 @@
 class WordSchedule {
+  String userId;
   String word;
   int repetitionStep; // 0-7 index into schedule array
   String lastReviewDate; // YYYY-MM-DD
@@ -7,6 +8,7 @@ class WordSchedule {
   bool isHard; // Marked after 3 failures
 
   WordSchedule({
+    required this.userId,
     required this.word,
     required this.repetitionStep,
     required this.lastReviewDate,
@@ -17,6 +19,7 @@ class WordSchedule {
 
   Map<String, dynamic> toMap() {
     return {
+      'user_id': userId,
       'word': word,
       'repetition_step': repetitionStep,
       'last_review_date': lastReviewDate,
@@ -28,6 +31,7 @@ class WordSchedule {
 
   factory WordSchedule.fromMap(Map<String, dynamic> map) {
     return WordSchedule(
+      userId: map['user_id'],
       word: map['word'],
       repetitionStep: map['repetition_step'],
       lastReviewDate: map['last_review_date'],
@@ -39,6 +43,6 @@ class WordSchedule {
 
   @override
   String toString() {
-    return 'WordSchedule(word: $word, repetitionStep: $repetitionStep, lastReviewDate: $lastReviewDate, nextReviewDate: $nextReviewDate, incorrectCount: $incorrectCount, isHard: $isHard)';
+    return 'WordSchedule(userId: $userId, word: $word, repetitionStep: $repetitionStep, lastReviewDate: $lastReviewDate, nextReviewDate: $nextReviewDate, incorrectCount: $incorrectCount, isHard: $isHard)';
   }
 }

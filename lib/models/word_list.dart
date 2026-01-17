@@ -2,6 +2,7 @@ import 'dart:convert';
 
 class WordList {
   String id;
+  String userId; // Firebase Auth UID - owner of this word list
   String subject;
   String listName;
   List<String> words;
@@ -10,6 +11,7 @@ class WordList {
 
   WordList({
     required this.id,
+    required this.userId,
     required this.subject,
     required this.listName,
     required this.words,
@@ -21,6 +23,7 @@ class WordList {
   Map<String, dynamic> toMap() {
     return {
       'id': id,
+      'user_id': userId,
       'subject': subject,
       'list_name': listName,
       'words': json.encode(words),
@@ -32,6 +35,7 @@ class WordList {
   factory WordList.fromMap(Map<String, dynamic> map) {
     return WordList(
       id: map['id'],
+      userId: map['user_id'] ?? '',
       subject: map['subject'],
       listName: map['list_name'],
       words: List<String>.from(json.decode(map['words'])),

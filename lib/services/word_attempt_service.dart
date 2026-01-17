@@ -26,6 +26,14 @@ class WordAttemptService {
       return;
     }
 
+    // Ensure userId is set from current user if not already set
+    if (attempt.userId.isEmpty) {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        attempt.userId = user.uid;
+      }
+    }
+
     // SQLite insert (source of truth)
     await _databaseHelper.insertWordAttempt(attempt);
 
@@ -52,23 +60,31 @@ class WordAttemptService {
     return 'local_student';
   }
 
-  static Future<List<WordAttempt>> getAllAttempts() async {
-    if (kIsWeb) return List.from(_webAttempts);
-    return await _databaseHelper.getAllWordAttempts();
+  static Future<List<WordAttempt>> getAllAttempts(String userId) async {
+    if (kIsWeb) {
+      return _webAttempts.where((a) => a.userId == userId).toList();
+    }
+    return await _databaseHelper.getAllWordAttempts(userId);
   }
 
-  static Future<List<WordAttempt>> getAttemptsBySubject(String subject) async {
+  static Future<List<WordAttempt>> getAttemptsBySubject(
+    String userId,
+    String subject,
+  ) async {
     if (kIsWeb) {
-      return _webAttempts.where((a) => a.subject == subject).toList();
+      return _webAttempts
+          .where((a) => a.userId == userId && a.subject == subject)
+          .toList();
     }
-    return await _databaseHelper.getWordAttemptsBySubject(subject);
+    return await _databaseHelper.getWordAttemptsBySubject(userId, subject);
   }
 
   static Future<List<WordAttempt>> getAttemptsByWordList(
+    String userId,
     String subject,
     String listName,
   ) async {
-    final allAttempts = await getAllAttempts();
+    final allAttempts = await getAllAttempts(userId);
     return allAttempts
         .where(
           (attempt) =>
@@ -77,28 +93,37 @@ class WordAttemptService {
         .toList();
   }
 
-  static Future<List<WordAttempt>> getAttemptsByDate(String date) async {
-    final allAttempts = await getAllAttempts();
+  static Future<List<WordAttempt>> getAttemptsByDate(
+    String userId,
+    String date,
+  ) async {
+    final allAttempts = await getAllAttempts(userId);
     return allAttempts.where((attempt) => attempt.date == date).toList();
   }
 
   static Future<List<WordAttempt>> getAttemptsByWordAndDate(
+    String userId,
     String word,
     String date,
   ) async {
     if (kIsWeb) {
       return _webAttempts
-          .where((a) => a.word == word && a.date == date)
+          .where((a) => a.userId == userId && a.word == word && a.date == date)
           .toList();
     }
-    return await _databaseHelper.getWordAttemptsByWordAndDate(word, date);
+    return await _databaseHelper.getWordAttemptsByWordAndDate(
+      userId,
+      word,
+      date,
+    );
   }
 
   static Future<WordAttempt?> getLastAttemptByWordAndDate(
+    String userId,
     String word,
     String date,
   ) async {
-    final attempts = await getAttemptsByWordAndDate(word, date);
+    final attempts = await getAttemptsByWordAndDate(userId, word, date);
     if (attempts.isEmpty) return null;
 
     // Sort by timestamp (newest first)
@@ -106,8 +131,11 @@ class WordAttemptService {
     return attempts.first;
   }
 
-  static Future<Map<String, dynamic>> getProgressStats(String subject) async {
-    final attempts = await getAttemptsBySubject(subject);
+  static Future<Map<String, dynamic>> getProgressStats(
+    String userId,
+    String subject,
+  ) async {
+    final attempts = await getAttemptsBySubject(userId, subject);
 
     int totalAttempts = attempts.length;
     int correctAttempts = attempts.where((a) => a.result == 'correct').length;
@@ -134,10 +162,11 @@ class WordAttemptService {
   }
 
   // Helper method to generate sample data for testing
-  static Future<void> generateSampleData() async {
+  static Future<void> generateSampleData(String userId) async {
     final sampleAttempts = [
       // English V1 attempts
       WordAttempt(
+        userId: userId,
         word: 'find',
         date: '2025-01-10',
         result: 'correct',
@@ -148,6 +177,7 @@ class WordAttemptService {
         heardOrTyped: 'find',
       ),
       WordAttempt(
+        userId: userId,
         word: 'find',
         date: '2025-01-11',
         result: 'correct',
@@ -158,6 +188,7 @@ class WordAttemptService {
         heardOrTyped: 'find',
       ),
       WordAttempt(
+        userId: userId,
         word: 'find',
         date: '2025-01-13',
         result: 'incorrect',
@@ -168,6 +199,7 @@ class WordAttemptService {
         heardOrTyped: 'fond',
       ),
       WordAttempt(
+        userId: userId,
         word: 'put',
         date: '2025-01-10',
         result: 'correct',
@@ -178,6 +210,7 @@ class WordAttemptService {
         heardOrTyped: 'put',
       ),
       WordAttempt(
+        userId: userId,
         word: 'put',
         date: '2025-01-11',
         result: 'missed',
@@ -188,6 +221,7 @@ class WordAttemptService {
         heardOrTyped: '',
       ),
       WordAttempt(
+        userId: userId,
         word: 'what',
         date: '2025-01-10',
         result: 'correct',
@@ -199,6 +233,7 @@ class WordAttemptService {
       ),
       // Math attempts
       WordAttempt(
+        userId: userId,
         word: 'one',
         date: '2025-01-09',
         result: 'correct',
@@ -209,6 +244,7 @@ class WordAttemptService {
         heardOrTyped: 'one',
       ),
       WordAttempt(
+        userId: userId,
         word: 'one',
         date: '2025-01-10',
         result: 'correct',
@@ -219,6 +255,7 @@ class WordAttemptService {
         heardOrTyped: 'one',
       ),
       WordAttempt(
+        userId: userId,
         word: 'two',
         date: '2025-01-09',
         result: 'incorrect',
@@ -230,6 +267,7 @@ class WordAttemptService {
       ),
       // Science attempts
       WordAttempt(
+        userId: userId,
         word: 'atom',
         date: '2025-01-08',
         result: 'correct',
@@ -240,6 +278,7 @@ class WordAttemptService {
         heardOrTyped: 'atom',
       ),
       WordAttempt(
+        userId: userId,
         word: 'atom',
         date: '2025-01-09',
         result: 'correct',
@@ -250,6 +289,7 @@ class WordAttemptService {
         heardOrTyped: 'atom',
       ),
       WordAttempt(
+        userId: userId,
         word: 'cell',
         date: '2025-01-08',
         result: 'missed',

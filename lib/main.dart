@@ -8,7 +8,6 @@ import 'services/gamification_service.dart';
 import 'services/local_tts_service.dart';
 import 'assessment_result_service.dart';
 import 'navigation/app_routes.dart';
-import 'screens/main_screen.dart';
 import 'screens/dev_login_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
@@ -27,8 +26,8 @@ void main() async {
       await WordListService.init();
       await WordAttemptService.init();
       await SpacedRepetitionService.init();
-      await GamificationService.init();
       await AssessmentResultService.init();
+      // Note: GamificationService.init() is called per-user after login
     } catch (e) {
       debugPrint('Warning: Failed to initialize database services: $e');
     }
@@ -45,14 +44,7 @@ void main() async {
     // Continue anyway - the service will handle fallbacks
   }
 
-  // Create default word lists if none exist (only for non-web platforms)
-  if (!kIsWeb) {
-    try {
-      await WordListService.createDefaultWordLists();
-    } catch (e) {
-      debugPrint('Warning: Failed to create default word lists: $e');
-    }
-  }
+  // Note: Default word lists are now created after user login (see dev_login_screen.dart)
 
   runApp(const MyApp());
 }

@@ -1,4 +1,5 @@
 class WordAttempt {
+  String userId; // Firebase Auth UID - owner of this attempt
   String word;
   String date; // YYYY-MM-DD format
   String result; // "correct", "incorrect", "missed"
@@ -10,6 +11,7 @@ class WordAttempt {
   String timestamp; // ISO8601 timestamp for uniqueness
 
   WordAttempt({
+    required this.userId,
     required this.word,
     required this.date,
     required this.result,
@@ -27,6 +29,7 @@ class WordAttempt {
   Map<String, dynamic> toMap() {
     return {
       'id': id,
+      'user_id': userId,
       'word': word,
       'date': date,
       'result': result,
@@ -41,6 +44,7 @@ class WordAttempt {
 
   factory WordAttempt.fromMap(Map<String, dynamic> map) {
     return WordAttempt(
+      userId: map['user_id'] ?? '',
       word: map['word'],
       date: map['date'],
       result: map['result'],
