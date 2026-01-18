@@ -10,8 +10,14 @@ import 'services/app_settings_service.dart';
 import 'assessment_result_service.dart';
 import 'navigation/app_routes.dart';
 import 'screens/dev_login_screen.dart';
+import 'screens/auth_gate.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_options.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'screens/main_screen.dart';
+import 'screens/consent_screen.dart';
+import 'utils/logger.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,7 +28,7 @@ void main() async {
   try {
     await AppSettingsService.init();
   } catch (e) {
-    debugPrint('Warning: AppSettingsService init failed: $e');
+    logDebug('Warning: AppSettingsService init failed: $e');
   }
 
   if (!kIsWeb) {
@@ -37,38 +43,43 @@ void main() async {
       await AssessmentResultService.init();
       // Note: GamificationService.init() is called per-user after login
     } catch (e) {
-      debugPrint('Warning: Failed to initialize database services: $e');
+      logDebug('Warning: Failed to initialize database services: $e');
     }
   } else {
-    debugPrint('Running on web - database services disabled');
+    logDebug('Running on web - database services disabled');
   }
 
   // Initialize TTS service
   try {
     await LocalTtsService.instance.init();
-    debugPrint('TTS service initialized successfully');
+    logDebug('TTS service initialized successfully');
   } catch (e) {
-    debugPrint('Warning: Failed to initialize TTS service: $e');
+    logDebug('Warning: Failed to initialize TTS service: $e');
     // Continue anyway - the service will handle fallbacks
   }
 
   // Note: Default word lists are now created after user login (see dev_login_screen.dart)
 
-  runApp(const MyApp());
+  final prefs = await SharedPreferences.getInstance();
+  final accepted = prefs.getBool('consentAccepted') ?? false;
+
+  runApp(MyApp(showConsent: !accepted));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final bool showConsent;
+  const MyApp({super.key, required this.showConsent});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       title: 'AI Reading Assistant',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: DevLoginScreen(), // Change from MainScreen
+      home: showConsent ? const ConsentScreen() : const AuthGate(),
       onGenerateRoute: AppRoutes.generateRoute,
     );
   }

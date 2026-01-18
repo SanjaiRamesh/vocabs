@@ -6,6 +6,7 @@ import '../services/word_attempt_service.dart';
 import '../services/word_list_service.dart';
 import '../services/spaced_repetition_service.dart';
 import '../services/database_helper.dart';
+import '../utils/logger.dart';
 
 class ProgressScreen extends StatefulWidget {
   const ProgressScreen({super.key});
@@ -64,7 +65,7 @@ class _ProgressScreenState extends State<ProgressScreen>
         setState(() => isAdmin = false);
       }
     } catch (e) {
-      debugPrint('Error checking admin role: $e');
+      logDebug('Error checking admin role: $e');
       setState(() => isAdmin = false);
     }
   }

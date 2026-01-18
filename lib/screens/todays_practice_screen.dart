@@ -7,6 +7,7 @@ import '../models/word_list.dart';
 import '../models/word_schedule.dart';
 import '../navigation/app_routes.dart';
 import '../widgets/gamification_widgets.dart';
+import '../utils/logger.dart';
 
 class TodaysPracticeScreen extends StatefulWidget {
   const TodaysPracticeScreen({super.key});
@@ -43,7 +44,7 @@ class _TodaysPracticeScreenState extends State<TodaysPracticeScreen> {
         _isLoading = false;
       });
     } catch (e) {
-      debugPrint('Error loading today\'s words: $e');
+      logDebug('Error loading today\'s words: $e');
       setState(() {
         _isLoading = false;
       });
@@ -60,7 +61,7 @@ class _TodaysPracticeScreenState extends State<TodaysPracticeScreen> {
         _availableSubjects = subjects;
       });
     } catch (e) {
-      debugPrint('Error loading subjects: $e');
+      logDebug('Error loading subjects: $e');
     }
   }
 
@@ -633,7 +634,7 @@ class _TodaysPracticeScreenState extends State<TodaysPracticeScreen> {
 
       return calendarData;
     } catch (e) {
-      debugPrint('Error loading calendar data: $e');
+      logDebug('Error loading calendar data: $e');
       return {};
     }
   }

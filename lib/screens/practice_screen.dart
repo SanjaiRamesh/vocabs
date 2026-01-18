@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import '../utils/logger.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:speech_to_text/speech_to_text.dart';
@@ -29,6 +30,10 @@ class _PracticeScreenState extends State<PracticeScreen>
   late SpeechToText _speechToText;
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
+
+  void _debugLog(String message) {
+    logDebug(message);
+  }
 
   PracticeTimeTracker? _practiceTimeTracker;
 
@@ -96,7 +101,7 @@ class _PracticeScreenState extends State<PracticeScreen>
     // Check if Flask service is available
     final isAvailable = await _ttsService.isFlaskServiceAvailable();
     if (!isAvailable) {
-      debugPrint(
+      _debugLog(
         'Warning: TTS Flask service is not available at 127.0.0.1:8080',
       );
       if (mounted) {
@@ -190,7 +195,7 @@ class _PracticeScreenState extends State<PracticeScreen>
     try {
       await _ttsService.speakChildFriendly(word);
     } catch (e) {
-      debugPrint('Error speaking word "$word": $e');
+      _debugLog('Error speaking word "$word": $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -312,14 +317,14 @@ class _PracticeScreenState extends State<PracticeScreen>
     );
 
     // Debug logging
-    debugPrint('DEBUG: Recording attempt for word: $_currentWord');
-    debugPrint('DEBUG: Repetition Step: $repetitionStep');
-    debugPrint('DEBUG: Mode: ${widget.mode}');
-    debugPrint('DEBUG: User answer: $userAnswer');
-    debugPrint('DEBUG: Is correct: $isCorrect');
-    debugPrint('DEBUG: Result type: $resultType');
-    debugPrint('DEBUG: Subject: ${widget.wordList.subject}');
-    debugPrint('DEBUG: List: ${widget.wordList.listName}');
+    _debugLog('Recording attempt for word: $_currentWord');
+    _debugLog('Repetition Step: $repetitionStep');
+    _debugLog('Mode: ${widget.mode}');
+    _debugLog('User answer: $userAnswer');
+    _debugLog('Is correct: $isCorrect');
+    _debugLog('Result type: $resultType');
+    _debugLog('Subject: ${widget.wordList.subject}');
+    _debugLog('List: ${widget.wordList.listName}');
 
     // Store result for practice summary
     _practiceResults.add({
@@ -345,7 +350,7 @@ class _PracticeScreenState extends State<PracticeScreen>
       await _processGamificationReward();
     }
 
-    debugPrint('DEBUG: Attempt saved successfully');
+    _debugLog('Attempt saved successfully');
   }
 
   Future<void> _processGamificationReward() async {
@@ -377,7 +382,7 @@ class _PracticeScreenState extends State<PracticeScreen>
               headerState.refresh();
             }
           } catch (e) {
-            debugPrint('Error refreshing gamification header: $e');
+            _debugLog('Error refreshing gamification header: $e');
           }
         }
       });
@@ -394,7 +399,7 @@ class _PracticeScreenState extends State<PracticeScreen>
         );
       }
     } catch (e) {
-      debugPrint('Error processing gamification reward: $e');
+      _debugLog('Error processing gamification reward: $e');
     }
   }
 
@@ -485,9 +490,9 @@ class _PracticeScreenState extends State<PracticeScreen>
     showDialog(
       context: context,
       barrierDismissible: false, // Prevent tapping outside/behind the dialog
-      builder: (context) => WillPopScope(
+      builder: (context) => PopScope(
         // Block system back; only dialog buttons close it
-        onWillPop: () async => false,
+        canPop: false,
         child: AlertDialog(
           title: const Text(
             'Practice Complete!',

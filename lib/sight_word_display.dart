@@ -4,6 +4,7 @@ import 'package:speech_to_text/speech_to_text.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'word_list.dart';
+import 'utils/logger.dart';
 
 /// Widget for displaying sight words fullscreen, one at a time, for 5 seconds each.
 /// SightWordDisplay now supports audio recording, assessment, and feedback per new instructions.
@@ -203,7 +204,10 @@ class _SightWordDisplayState extends State<SightWordDisplay> {
     setState(() {
       _isRecording = false;
     });
-    debugPrint('Recognized: \\${resultText ?? ''}');
+    logDebug(
+      'Recognized: \${resultText ?? '
+      '}',
+    );
     return resultText;
   }
 

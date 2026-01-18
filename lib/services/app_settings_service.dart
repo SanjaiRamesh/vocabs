@@ -1,6 +1,7 @@
-import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:sqflite/sqflite.dart' show ConflictAlgorithm, Database;
 import 'database_helper.dart';
+import '../utils/logger.dart';
 
 /// Simple app settings service backed by SQLite (sqflite).
 /// Stores runtime-configurable values like the TTS base URL.
@@ -16,7 +17,7 @@ class AppSettingsService {
     if (_initialized) return;
     if (kIsWeb) {
       // Web not supported with sqflite in this project
-      debugPrint('AppSettingsService: Web platform not supported');
+      logDebug('AppSettingsService: Web platform not supported');
       _initialized = true;
       return;
     }
@@ -29,9 +30,9 @@ class AppSettingsService {
         )
       ''');
       _initialized = true;
-      debugPrint('AppSettingsService (SQLite) initialized');
+      logDebug('AppSettingsService (SQLite) initialized');
     } catch (e) {
-      debugPrint('Failed to initialize AppSettingsService (SQLite): $e');
+      logDebug('Failed to initialize AppSettingsService (SQLite): $e');
       rethrow;
     }
   }
@@ -53,7 +54,7 @@ class AppSettingsService {
       }
       return null;
     } catch (e) {
-      debugPrint('Error reading base URL from settings (SQLite): $e');
+      logDebug('Error reading base URL from settings (SQLite): $e');
       return null;
     }
   }
@@ -66,9 +67,9 @@ class AppSettingsService {
         _colKey: 'base_url',
         _colValue: url.trim(),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
-      debugPrint('Base URL saved (SQLite): $url');
+      logDebug('Base URL saved (SQLite): $url');
     } catch (e) {
-      debugPrint('Error saving base URL to settings (SQLite): $e');
+      logDebug('Error saving base URL to settings (SQLite): $e');
       rethrow;
     }
   }
@@ -82,9 +83,9 @@ class AppSettingsService {
         where: '$_colKey = ?',
         whereArgs: ['base_url'],
       );
-      debugPrint('Base URL cleared (SQLite)');
+      logDebug('Base URL cleared (SQLite)');
     } catch (e) {
-      debugPrint('Error clearing base URL (SQLite): $e');
+      logDebug('Error clearing base URL (SQLite): $e');
     }
   }
 }

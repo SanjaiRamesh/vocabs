@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../services/word_list_service.dart';
 import '../services/gamification_service.dart';
 import 'admin_screen.dart';
 import 'main_screen.dart';
+import '../utils/logger.dart';
 
 class DevLoginScreen extends StatefulWidget {
   DevLoginScreen({super.key});
@@ -30,14 +31,14 @@ class _DevLoginScreenState extends State<DevLoginScreen> {
   }
 
   Future<void> _login() async {
-    debugPrint('DEBUG: Login button pressed');
+    logDebug('DEBUG: Login button pressed');
     final usernameOrEmail = _emailController.text.trim();
     final email = usernameOrEmail.contains('@')
         ? usernameOrEmail
         : '$usernameOrEmail$_domainSuffix';
     final password = _passwordController.text.trim();
 
-    debugPrint('DEBUG: Email = $email');
+    logDebug('DEBUG: Email = $email');
 
     if (email.isEmpty || password.isEmpty) {
       _showError('Email and password are required');
@@ -49,7 +50,7 @@ class _DevLoginScreenState extends State<DevLoginScreen> {
     });
 
     try {
-      debugPrint('DEBUG: Calling signInWithEmailAndPassword...');
+      logDebug('DEBUG: Calling signInWithEmailAndPassword...');
 
       // Sign in with Firebase Auth
       final userCredential = await _auth.signInWithEmailAndPassword(
@@ -58,13 +59,13 @@ class _DevLoginScreenState extends State<DevLoginScreen> {
       );
 
       // DEBUG LOG
-      debugPrint('DEBUG: Sign-in successful!');
+      logDebug('DEBUG: Sign-in successful!');
 
       final uid = userCredential.user!.uid;
-      debugPrint('UID_RAW=[$uid]');
-      debugPrint('UID_CODES=${uid.runes.toList()}');
+      logDebug('UID_RAW=[$uid]');
+      logDebug('UID_CODES=${uid.runes.toList()}');
 
-      debugPrint(
+      logDebug(
         'DEBUG: Logged-in UID = ${FirebaseAuth.instance.currentUser?.uid}',
       );
 
@@ -72,12 +73,12 @@ class _DevLoginScreenState extends State<DevLoginScreen> {
         throw Exception('User ID not found');
       }
 
-      debugPrint('DEBUG: Fetching user role from Firestore...');
+      logDebug('DEBUG: Fetching user role from Firestore...');
 
       // Read user role from Firestore
       final userDoc = await _firestore.collection('users').doc(uid).get();
 
-      debugPrint('DEBUG: User doc exists = ${userDoc.exists}');
+      logDebug('DEBUG: User doc exists = ${userDoc.exists}');
 
       if (!userDoc.exists) {
         throw Exception('User document not found in Firestore for uid=$uid');
@@ -85,7 +86,7 @@ class _DevLoginScreenState extends State<DevLoginScreen> {
 
       final role = userDoc.data()?['role'] as String?;
 
-      debugPrint('DEBUG: User role = $role');
+      logDebug('DEBUG: User role = $role');
 
       if (role == null) {
         throw Exception('User role not found');
@@ -95,19 +96,17 @@ class _DevLoginScreenState extends State<DevLoginScreen> {
       if (!kIsWeb) {
         try {
           await WordListService.createDefaultWordLists(uid);
-          debugPrint(
-            'DEBUG: Default word lists created/verified for user $uid',
-          );
+          logDebug('DEBUG: Default word lists created/verified for user $uid');
         } catch (e) {
-          debugPrint('Warning: Failed to create default word lists: $e');
+          logDebug('Warning: Failed to create default word lists: $e');
         }
 
         // Initialize gamification system for this user
         try {
           await GamificationService.init(uid);
-          debugPrint('DEBUG: Gamification system initialized for user $uid');
+          logDebug('DEBUG: Gamification system initialized for user $uid');
         } catch (e) {
-          debugPrint('Warning: Failed to initialize gamification system: $e');
+          logDebug('Warning: Failed to initialize gamification system: $e');
         }
       }
 
@@ -115,13 +114,13 @@ class _DevLoginScreenState extends State<DevLoginScreen> {
 
       // Navigate based on role
       if (role == 'admin') {
-        debugPrint('DEBUG: Navigating to AdminScreen');
+        logDebug('DEBUG: Navigating to AdminScreen');
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const AdminScreen()),
         );
       } else if (role == 'student') {
-        debugPrint('DEBUG: Navigating to MainScreen');
+        logDebug('DEBUG: Navigating to MainScreen');
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const MainScreen()),
@@ -130,12 +129,12 @@ class _DevLoginScreenState extends State<DevLoginScreen> {
         throw Exception('Unknown role: $role');
       }
     } on FirebaseAuthException catch (e) {
-      debugPrint('DEBUG: FirebaseAuthException - ${e.code}: ${e.message}');
+      logDebug('DEBUG: FirebaseAuthException - ${e.code}: ${e.message}');
       if (mounted) {
         _showError('Login failed: ${e.message ?? e.code}');
       }
     } catch (e) {
-      debugPrint('DEBUG: Error - $e');
+      logDebug('DEBUG: Error - $e');
       if (mounted) {
         _showError('Error: $e');
       }
@@ -149,7 +148,7 @@ class _DevLoginScreenState extends State<DevLoginScreen> {
   }
 
   void _showError(String message) {
-    debugPrint('DEBUG: Error - $message');
+    logDebug('DEBUG: Error - $message');
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(message)));

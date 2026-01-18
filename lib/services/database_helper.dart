@@ -2,13 +2,14 @@
 import 'package:sqflite_common_ffi/sqflite_ffi.dart'; // For desktop
 import 'package:path/path.dart';
 import 'dart:convert';
-import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../models/word_list.dart';
 import '../models/word_attempt.dart';
 import '../models/word_schedule.dart';
 import '../models/word_review_plan.dart';
 import '../models/word_review_date.dart';
 import '../models/word_attempt_log.dart';
+import '../utils/logger.dart';
 
 // Conditional import for Platform
 import 'platform_helper.dart'
@@ -635,7 +636,7 @@ class DatabaseHelper {
     await db.delete('word_review_dates');
     await db.delete('word_review_plans');
     await db.delete('word_attempt_logs');
-    debugPrint('✅ Cleared all review schedules, plans, and attempt logs');
+    logDebug('✅ Cleared all review schedules, plans, and attempt logs');
   }
 
   // ============ Word Review Plan Operations ============

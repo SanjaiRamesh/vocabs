@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../utils/logger.dart';
 
 class LocalTtsService {
   static LocalTtsService? _instance;
@@ -16,7 +17,7 @@ class LocalTtsService {
   /// Initialize the TTS service
   Future<void> init() async {
     if (_isInitialized) return;
-    debugPrint('TTS disabled on web platform - using silent mode');
+    logDebug('TTS disabled on web platform - using silent mode');
     _isInitialized = true;
   }
 
@@ -27,7 +28,7 @@ class LocalTtsService {
 
   /// Speak with child-friendly default settings
   Future<void> speakChildFriendly(String text) async {
-    debugPrint('TTS (web silent mode): "$text"');
+    logDebug('TTS (web silent mode): "$text"');
   }
 
   /// Speak the given text
@@ -37,7 +38,7 @@ class LocalTtsService {
     String lang = 'en',
     VoidCallback? onAudioStarted,
   }) async {
-    debugPrint('TTS (web silent mode): "$text"');
+    logDebug('TTS (web silent mode): "$text"');
     if (onAudioStarted != null) {
       Future.delayed(const Duration(milliseconds: 100), onAudioStarted);
     }

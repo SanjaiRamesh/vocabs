@@ -1,8 +1,9 @@
 import '../models/word_attempt.dart';
 import 'database_helper.dart';
 import 'firestore_word_attempt_service.dart';
-import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:firebase_auth/firebase_auth.dart';
+import '../utils/logger.dart';
 
 class WordAttemptService {
   static final DatabaseHelper _databaseHelper = DatabaseHelper();
@@ -43,7 +44,7 @@ class WordAttemptService {
       await _firestoreService.logAttempt(studentId, attempt);
     } catch (e) {
       // Log Firestore failures but don't break the app
-      debugPrint('Firestore sync failed for attempt ${attempt.id}: $e');
+      logDebug('Firestore sync failed for attempt ${attempt.id}: $e');
     }
   }
 

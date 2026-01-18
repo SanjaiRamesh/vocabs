@@ -4,6 +4,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import 'package:http/http.dart' as http;
 import 'package:flutter_sound/flutter_sound.dart';
+import '../utils/logger.dart';
 
 // Platform helper
 import 'platform_helper_io.dart';
@@ -49,18 +50,18 @@ class LocalTtsService {
         final configured = await AppSettingsService.getBaseUrl();
         if (configured != null && configured.trim().isNotEmpty) {
           _baseUrl = configured.trim();
-          debugPrint('Using configured TTS base URL: $_baseUrl');
+          logDebug('Using configured TTS base URL: $_baseUrl');
         } else {
-          debugPrint('Using default TTS base URL: $_baseUrl');
+          logDebug('Using default TTS base URL: $_baseUrl');
         }
       } catch (e) {
-        debugPrint('Unable to load configured base URL: $e');
+        logDebug('Unable to load configured base URL: $e');
       }
       // On Windows, disable TTS for now due to compatibility issues
       if (isWindows()) {
         _useSystemTts = true;
         _isInitialized = true;
-        debugPrint('TTS disabled on Windows platform - using silent mode');
+        logDebug('TTS disabled on Windows platform - using silent mode');
         return;
       }
 
@@ -69,9 +70,9 @@ class LocalTtsService {
         _audioPlayer = FlutterSoundPlayer();
         await _audioPlayer!.openPlayer();
         _useSystemTts = false;
-        debugPrint('FlutterSound initialized successfully');
+        logDebug('FlutterSound initialized successfully');
       } catch (e) {
-        debugPrint('FlutterSound not available, using silent mode: $e');
+        logDebug('FlutterSound not available, using silent mode: $e');
         _useSystemTts = true;
       }
 
@@ -79,11 +80,11 @@ class LocalTtsService {
       await _createCacheDirectory();
 
       _isInitialized = true;
-      debugPrint(
+      logDebug(
         'LocalTtsService initialized successfully (useSystemTts: $_useSystemTts)',
       );
     } catch (e) {
-      debugPrint('Error initializing LocalTtsService: $e');
+      logDebug('Error initializing LocalTtsService: $e');
       // Don't rethrow, just mark as failed and continue
       _isInitialized = false;
     }
@@ -99,9 +100,9 @@ class LocalTtsService {
     _baseUrl = sanitized;
     try {
       await AppSettingsService.setBaseUrl(sanitized);
-      debugPrint('Runtime base URL updated: $_baseUrl');
+      logDebug('Runtime base URL updated: $_baseUrl');
     } catch (e) {
-      debugPrint('Failed to persist base URL: $e');
+      logDebug('Failed to persist base URL: $e');
     }
   }
 
@@ -114,9 +115,9 @@ class LocalTtsService {
         await _audioPlayer!.closePlayer();
       }
       _isInitialized = false;
-      debugPrint('LocalTtsService disposed');
+      logDebug('LocalTtsService disposed');
     } catch (e) {
-      debugPrint('Error disposing LocalTtsService: $e');
+      logDebug('Error disposing LocalTtsService: $e');
     }
   }
 
@@ -128,10 +129,10 @@ class LocalTtsService {
 
       if (!await cacheDir.exists()) {
         await cacheDir.create(recursive: true);
-        debugPrint('Created TTS cache directory: ${cacheDir.path}');
+        logDebug('Created TTS cache directory: ${cacheDir.path}');
       }
     } catch (e) {
-      debugPrint('Error creating cache directory: $e');
+      logDebug('Error creating cache directory: $e');
       rethrow;
     }
   }
@@ -170,21 +171,21 @@ class LocalTtsService {
     String lang = 'en-in',
   }) async {
     try {
-      debugPrint('Requesting TTS for: "$text" (format: $format, lang: $lang)');
+      logDebug('Requesting TTS for: "$text" (format: $format, lang: $lang)');
 
       // Build URL with query parameters
       final uri = Uri.parse('$_baseUrl/speak').replace(
         queryParameters: {'text': text, 'format': format, 'lang': lang},
       );
 
-      debugPrint('TTS Request URL: $uri');
+      logDebug('TTS Request URL: $uri');
 
       final response = await http
           .get(uri, headers: _ngrokHeaders)
           .timeout(const Duration(seconds: 20));
 
       if (response.statusCode == 200) {
-        debugPrint(
+        logDebug(
           'Successfully received audio data (${response.bodyBytes.length} bytes)',
         );
         return response.bodyBytes;
@@ -194,7 +195,7 @@ class LocalTtsService {
         );
       }
     } catch (e) {
-      debugPrint('Error downloading audio from Flask service: $e');
+      logDebug('Error downloading audio from Flask service: $e');
       rethrow;
     }
   }
@@ -204,9 +205,9 @@ class LocalTtsService {
     try {
       final file = File(filePath);
       await file.writeAsBytes(audioData);
-      debugPrint('Saved audio to cache: $filePath');
+      logDebug('Saved audio to cache: $filePath');
     } catch (e) {
-      debugPrint('Error saving to cache: $e');
+      logDebug('Error saving to cache: $e');
       rethrow;
     }
   }
@@ -224,18 +225,18 @@ class LocalTtsService {
     VoidCallback? onAudioStarted, // New callback parameter
   }) async {
     if (!_isInitialized) {
-      debugPrint(
+      logDebug(
         'Warning: LocalTtsService not initialized, attempting to initialize...',
       );
       await init();
       if (!_isInitialized) {
-        debugPrint('Failed to initialize TTS service');
+        logDebug('Failed to initialize TTS service');
         return;
       }
     }
 
     if (text.trim().isEmpty) {
-      debugPrint('Warning: Empty text provided to speak()');
+      logDebug('Warning: Empty text provided to speak()');
       return;
     }
 
@@ -245,7 +246,7 @@ class LocalTtsService {
     try {
       if (_useSystemTts || isWindows()) {
         // On Windows, just log the text instead of speaking
-        debugPrint('TTS (silent mode): "$text"');
+        logDebug('TTS (silent mode): "$text"');
         // Simulate audio start for testing
         if (onAudioStarted != null) {
           Future.delayed(const Duration(milliseconds: 100), onAudioStarted);
@@ -253,12 +254,12 @@ class LocalTtsService {
         return;
       } else {
         // Use server-based TTS with caching (Android and other platforms)
-        debugPrint('Using server TTS for: "$text"');
+        logDebug('Using server TTS for: "$text"');
         final filePath = await _getCacheFilePath(text, format: format);
 
         // Check if file is already cached
         if (!await _isFileCached(filePath)) {
-          debugPrint('Audio not cached, downloading from Flask service...');
+          logDebug('Audio not cached, downloading from Flask service...');
 
           // Download from Flask service with child-friendly settings
           final audioData = await _downloadAudioFromFlask(
@@ -270,7 +271,7 @@ class LocalTtsService {
           // Save to cache
           await _saveToCache(filePath, audioData);
         } else {
-          debugPrint('Using cached audio: $filePath');
+          logDebug('Using cached audio: $filePath');
         }
 
         // Determine codec based on format
@@ -284,15 +285,13 @@ class LocalTtsService {
           onAudioStarted();
         }
 
-        debugPrint(
-          'Playing audio for: "$text" (format: $format, codec: $codec)',
-        );
+        logDebug('Playing audio for: "$text" (format: $format, codec: $codec)');
       }
     } catch (e) {
-      debugPrint('TTS failed: $e');
+      logDebug('TTS failed: $e');
       // On Android, we can fallback to silent mode if server TTS fails
       if (!isWindows()) {
-        debugPrint('Server TTS failed, continuing in silent mode');
+        logDebug('Server TTS failed, continuing in silent mode');
       }
     }
   }
@@ -306,36 +305,36 @@ class LocalTtsService {
       if (!_useSystemTts && !isWindows() && _audioPlayer != null) {
         await _audioPlayer!.stopPlayer();
       }
-      debugPrint('Stopped audio playback');
+      logDebug('Stopped audio playback');
     } catch (e) {
-      debugPrint('Error stopping playback: $e');
+      logDebug('Error stopping playback: $e');
     }
   }
 
   /// Check if TTS Flask service is available
   Future<bool> isFlaskServiceAvailable() async {
     try {
-      debugPrint('Testing connection to TTS service: $_baseUrl');
+      logDebug('Testing connection to TTS service: $_baseUrl');
 
       final response = await http
           .get(Uri.parse('$_baseUrl/health'), headers: _ngrokHeaders)
           .timeout(const Duration(seconds: 5));
 
       final isAvailable = response.statusCode == 200;
-      debugPrint('TTS service availability: $isAvailable');
+      logDebug('TTS service availability: $isAvailable');
 
       if (isAvailable) {
-        debugPrint('TTS service response: ${response.body}');
+        logDebug('TTS service response: ${response.body}');
       }
 
       return isAvailable;
     } catch (e) {
-      debugPrint('TTS Flask service not available: $e');
-      debugPrint('Possible solutions:');
-      debugPrint('1. Check if Flask server is running');
-      debugPrint('2. Verify device and PC are on same WiFi network');
-      debugPrint('3. Check Windows Firewall settings');
-      debugPrint('4. Try connecting via USB and port forwarding');
+      logDebug('TTS Flask service not available: $e');
+      logDebug('Possible solutions:');
+      logDebug('1. Check if Flask server is running');
+      logDebug('2. Verify device and PC are on same WiFi network');
+      logDebug('3. Check Windows Firewall settings');
+      logDebug('4. Try connecting via USB and port forwarding');
       return false;
     }
   }
@@ -346,22 +345,22 @@ class LocalTtsService {
 
     // Test 1: Basic internet connectivity
     try {
-      debugPrint('Testing internet connectivity...');
+      logDebug('Testing internet connectivity...');
       final response = await http
           .get(Uri.parse('https://www.google.com'))
           .timeout(const Duration(seconds: 5));
 
       results['internet'] = response.statusCode == 200;
-      debugPrint('Internet connectivity: ${results['internet']}');
+      logDebug('Internet connectivity: ${results['internet']}');
     } catch (e) {
       results['internet'] = false;
       results['internet_error'] = e.toString();
-      debugPrint('Internet connectivity failed: $e');
+      logDebug('Internet connectivity failed: $e');
     }
 
     // Test 2: TTS service health check
     try {
-      debugPrint('Testing TTS service health...');
+      logDebug('Testing TTS service health...');
       final response = await http
           .get(Uri.parse('$_baseUrl/health'), headers: _ngrokHeaders)
           .timeout(const Duration(seconds: 5));
@@ -370,11 +369,11 @@ class LocalTtsService {
       if (results['tts_service']) {
         results['tts_response'] = response.body;
       }
-      debugPrint('TTS service health: ${results['tts_service']}');
+      logDebug('TTS service health: ${results['tts_service']}');
     } catch (e) {
       results['tts_service'] = false;
       results['tts_error'] = e.toString();
-      debugPrint('TTS service health failed: $e');
+      logDebug('TTS service health failed: $e');
     }
 
     // Test 3: Network configuration info
@@ -390,12 +389,12 @@ class LocalTtsService {
       'Check device WiFi connection',
     ];
 
-    debugPrint('=== NETWORK TEST RESULTS ===');
-    debugPrint('Base URL: ${results['base_url']}');
-    debugPrint('Platform: ${results['platform']}');
-    debugPrint('Internet: ${results['internet']}');
-    debugPrint('TTS Service: ${results['tts_service']}');
-    debugPrint('==============================');
+    logDebug('=== NETWORK TEST RESULTS ===');
+    logDebug('Base URL: ${results['base_url']}');
+    logDebug('Platform: ${results['platform']}');
+    logDebug('Internet: ${results['internet']}');
+    logDebug('TTS Service: ${results['tts_service']}');
+    logDebug('==============================');
 
     return results;
   }
@@ -409,10 +408,10 @@ class LocalTtsService {
       if (await cacheDir.exists()) {
         await cacheDir.delete(recursive: true);
         await _createCacheDirectory(); // Recreate empty directory
-        debugPrint('Cleared TTS cache');
+        logDebug('Cleared TTS cache');
       }
     } catch (e) {
-      debugPrint('Error clearing cache: $e');
+      logDebug('Error clearing cache: $e');
     }
   }
 
@@ -438,7 +437,7 @@ class LocalTtsService {
             final length = await file.length();
             totalSize += length;
           } catch (e) {
-            debugPrint('Error getting file size: $e');
+            logDebug('Error getting file size: $e');
           }
         }
       }
@@ -449,7 +448,7 @@ class LocalTtsService {
         'totalSizeMB': (totalSize / (1024 * 1024)).toStringAsFixed(2),
       };
     } catch (e) {
-      debugPrint('Error getting cache stats: $e');
+      logDebug('Error getting cache stats: $e');
       return {'fileCount': 0, 'totalSize': 0, 'error': e.toString()};
     }
   }
